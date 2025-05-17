@@ -1,0 +1,20 @@
+echo "🛡️ Running pre-push checks..."
+echo "🔍 Verifying code formatting for the entire project..."
+
+# Run Prettier check for the entire project (stops push on error)
+if yarn lint:format; then
+  echo "✅ Code formatting check passed."
+else
+  echo "❌ Code formatting issues found. Please run 'yarn format' or 'make format' and try again."
+  exit 1 # Abort push
+fi
+
+# You can add commands like 'yarn test' here later.
+# if yarn test; then
+#   echo "✅ All tests passed."
+# else
+#   echo "❌ Tests failed. Please fix them before pushing."
+#   exit 1
+# fi
+
+echo "👍 Pre-push checks successful. Proceeding with push." 

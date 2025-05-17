@@ -1,0 +1,41 @@
+{
+  "name": "btcfi-orakle-6th",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/orakle-kaist/btcfi-orakle-6th.git"
+  },
+  "license": "MIT",
+  "author": "Orakle BTCFi 6th",
+  "contributors": [
+    "kyle-park-io <andy3638@naver.com>"
+  ],
+  "main": "",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:package": "sort-package-json",
+    "husky:postpack": "pinst --enable",
+    "husky:prepack": "pinst --disable",
+    "husky:prepare": "husky install",
+    "lint:commit:last": "commitlint --from HEAD~1 --to HEAD",
+    "lint:commit:range": "commitlint --from main --to HEAD",
+    "lint:format": "prettier --check ."
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,css,scss,md,yaml,yml}": "prettier --write",
+    "*.go": [
+      "# goimports -w",
+      "# golangci-lint run --fix"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.0.0",
+    "pinst": "^3.0.0",
+    "prettier": "^3.3.1",
+    "sort-package-json": "^3.2.1"
+  },
+  "packageManager": "yarn@1.22.22+sha1.ac34549e6aa8e7ead463a7407e1c7390f61a6610"
+}

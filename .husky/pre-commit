@@ -1,0 +1,7 @@
+echo "💅 Running pre-commit checks with lint-staged..."
+if npx lint-staged; then
+  : # lint-staged will indicate success
+else
+  echo "❌ Pre-commit checks failed. Please fix the issues and try committing again."
+  exit 1 # Abort commit
+fi
