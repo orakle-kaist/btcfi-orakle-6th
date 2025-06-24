@@ -67,3 +67,6 @@ deployments/
 # Added by cargo
 
 /target
+
+# Project-specific
+CLAUDE.md
