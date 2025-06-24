@@ -1,0 +1,23 @@
+[package]
+name = "aggregator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "aggregator"
+path = "src/main.rs"
+
+[dependencies]
+oracle-vm-common = { path = "../common" }
+
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"

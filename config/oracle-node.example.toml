@@ -1,0 +1,65 @@
+# Oracle Node Configuration Example
+
+[node]
+id = "oracle-node-1"
+secret_key_file = "keys/oracle-node-1.key"
+
+[network]
+listen_address = "0.0.0.0:9000"
+bootstrap_peers = [
+    "/ip4/127.0.0.1/tcp/9001/p2p/12D3KooWExample1",
+    "/ip4/127.0.0.1/tcp/9002/p2p/12D3KooWExample2"
+]
+max_peers = 50
+connection_timeout = "30s"
+
+[exchanges]
+# Binance API configuration
+[exchanges.binance]
+enabled = true
+api_key = "your_binance_api_key"
+api_secret = "your_binance_api_secret"
+rate_limit = 1200  # requests per minute
+timeout = "10s"
+
+# Coinbase API configuration  
+[exchanges.coinbase]
+enabled = true
+api_key = "your_coinbase_api_key"
+api_secret = "your_coinbase_api_secret"
+passphrase = "your_coinbase_passphrase"
+rate_limit = 600
+timeout = "10s"
+
+# Kraken API configuration
+[exchanges.kraken]
+enabled = true
+api_key = "your_kraken_api_key"
+api_secret = "your_kraken_api_secret"
+rate_limit = 720
+timeout = "10s"
+
+[data_collection]
+# How often to collect price data
+collection_interval = "30s"
+
+# Asset pairs to collect
+pairs = ["BTC/USD", "ETH/USD"]
+
+# Data validation settings
+max_price_deviation = 0.05  # 5% max deviation from median
+min_volume_threshold = 1000000  # Minimum 24h volume in USD
+
+[logging]
+level = "info"
+file = "logs/oracle-node.log"
+console = true
+
+[database]
+path = "data/oracle-node"
+cache_size = 268435456  # 256MB
+write_buffer_size = 67108864  # 64MB
+
+[metrics]
+enabled = true
+listen_address = "0.0.0.0:9090"

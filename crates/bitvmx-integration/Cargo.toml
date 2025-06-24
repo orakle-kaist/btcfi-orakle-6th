@@ -1,0 +1,22 @@
+[package]
+name = "bitvmx-integration"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+oracle-vm-common = { path = "../common" }
+
+# BitVMX CPU dependencies
+bitvmx-cpu-definitions = { path = "../../BitVMX-CPU/definitions" }
+emulator = { path = "../../BitVMX-CPU/emulator" }
+bitcoin-script-riscv = { path = "../../BitVMX-CPU/bitcoin-script-riscv" }
+
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+bitcoin = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"

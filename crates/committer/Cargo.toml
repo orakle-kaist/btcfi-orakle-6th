@@ -1,0 +1,22 @@
+[package]
+name = "committer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "committer"
+path = "src/main.rs"
+
+[dependencies]
+oracle-vm-common = { path = "../common" }
+
+tokio = { workspace = true }
+bitcoin = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
