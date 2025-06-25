@@ -64,9 +64,21 @@ deployments/
 .vercel/
 .next/
 
-# Added by cargo
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv
 
+# Added by cargo
 /target
+Cargo.lock
 
 # Project-specific
 CLAUDE.md
+temp_docs/
