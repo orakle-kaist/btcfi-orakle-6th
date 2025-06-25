@@ -47,41 +47,92 @@ impl AggregatorService {
         }
     }
     
-    /// 집계된 가격 계산 (최근 1분 내 데이터 평균값)
+    /// 안전한 집계 가격 계산 (엄격한 조건 검증)
     fn calculate_aggregated_price(&self) -> Option<f64> {
         let price_data = self.price_data.lock().unwrap();
         let now = Utc::now().timestamp() as u64;
         
-        // 각 노드의 최신 가격만 수집 (최근 1분 내)
-        let mut latest_per_node: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+        // Step 1: 각 거래소별 최신 데이터 수집 (거래소 이름으로 그룹핑)
+        let mut latest_per_exchange: std::collections::HashMap<String, (f64, u64)> = std::collections::HashMap::new();
         
         for data in price_data.iter() {
-            // 최근 1분 내 데이터만 사용
-            if now - data.received_at <= 60 {  // 1분 = 60초
-                // 각 노드의 최신 가격만 유지
-                latest_per_node
-                    .entry(data.node_id.clone())
-                    .and_modify(|existing_price| {
+            // 최근 2분 내 데이터만 사용 (더 넉넉한 윈도우)
+            if now - data.received_at <= 120 {  // 2분 = 120초
+                latest_per_exchange
+                    .entry(data.source.clone())  // source = exchange name
+                    .and_modify(|(existing_price, existing_time)| {
                         // 더 최신 데이터라면 업데이트
-                        if data.received_at > *existing_price as u64 {
+                        if data.timestamp > *existing_time {
                             *existing_price = data.price;
+                            *existing_time = data.timestamp;
                         }
                     })
-                    .or_insert(data.price);
+                    .or_insert((data.price, data.timestamp));
             }
         }
         
-        if latest_per_node.is_empty() {
+        // Step 2: 2/3 이상 합의 조건 검증
+        let required_exchanges = vec!["binance", "coinbase", "kraken"];
+        let total_exchanges = required_exchanges.len();
+        let min_required = (total_exchanges * 2 + 2) / 3; // ceil(2/3) = 2개 이상
+        
+        // 2.1 최소 필요 거래소 수 확인 (3개 중 2개 이상)
+        if latest_per_exchange.len() < min_required {
+            let missing: Vec<&str> = required_exchanges.iter()
+                .filter(|&exchange| !latest_per_exchange.contains_key(*exchange))
+                .cloned()
+                .collect();
+            warn!("⚠️ Insufficient consensus: {} of {} exchanges (need at least {}). Missing: {:?}", 
+                  latest_per_exchange.len(), total_exchanges, min_required, missing);
             return None;
         }
         
-        // 평균값 계산
-        let prices: Vec<f64> = latest_per_node.values().cloned().collect();
-        let average = prices.iter().sum::<f64>() / prices.len() as f64;
+        info!("✅ Consensus achieved: {} of {} exchanges participating", 
+              latest_per_exchange.len(), total_exchanges);
         
-        info!("📊 Calculated average from {} nodes: ${:.2}", prices.len(), average);
+        // 2.2 timestamp 동일성 검증 (1분 이내 차이만 허용)
+        let timestamps: Vec<u64> = latest_per_exchange.values().map(|(_, timestamp)| *timestamp).collect();
+        let min_timestamp = *timestamps.iter().min().unwrap();
+        let max_timestamp = *timestamps.iter().max().unwrap();
         
-        Some(average)
+        if max_timestamp - min_timestamp > 60 {  // 1분 초과 차이
+            warn!("⚠️ Timestamp mismatch: {} second difference. Min: {}, Max: {}", 
+                  max_timestamp - min_timestamp, min_timestamp, max_timestamp);
+            return None;
+        }
+        
+        // Step 3: 가격 이상치 검증
+        let prices: Vec<f64> = latest_per_exchange.values().map(|(price, _)| *price).collect();
+        let avg_price = prices.iter().sum::<f64>() / prices.len() as f64;
+        
+        // 3.1 개별 가격이 평균에서 5% 이상 벗어나는지 확인
+        for (exchange, (price, _)) in &latest_per_exchange {
+            let deviation = ((price - avg_price) / avg_price * 100.0).abs();
+            if deviation > 5.0 {  // 5% 초과 편차
+                warn!("⚠️ Price anomaly detected: {} = ${:.2} ({}% deviation from average ${:.2})", 
+                      exchange, price, deviation, avg_price);
+                return None;
+            }
+        }
+        
+        // 3.2 가격 범위 상식선 검증
+        if avg_price < 10000.0 || avg_price > 500000.0 {
+            warn!("⚠️ Unrealistic average price: ${:.2}", avg_price);
+            return None;
+        }
+        
+        // Step 4: 모든 검증 통과 시 집계 수행
+        let participating_exchanges: Vec<&String> = latest_per_exchange.keys().collect();
+        info!("✅ All validations passed. Participating exchanges: {:?}", participating_exchanges);
+        info!("📊 Consensus aggregated price: ${:.2} from {}/{} exchanges", 
+              avg_price, prices.len(), total_exchanges);
+        
+        // 개별 가격 로깅
+        for (exchange, (price, timestamp)) in &latest_per_exchange {
+            info!("   {}: ${:.2} (timestamp: {})", exchange, price, timestamp);
+        }
+        
+        Some(avg_price)
     }
     
     /// 활성 노드 업데이트
@@ -266,7 +317,7 @@ async fn main() -> Result<()> {
     info!("🔗 gRPC Aggregator listening on {}", addr);
     info!("📋 Available gRPC methods:");
     info!("   - SubmitPrice: 가격 데이터 제출");
-    info!("   - HealthCheck: 헬스체크");
+    info!("   - HealthCheck: 상태체크");
     info!("   - GetAggregatedPrice: 집계 가격 조회");
     
     Server::builder()
