@@ -1,0 +1,16 @@
+[oracle]
+node_id = "oracle-node-kraken-1"
+aggregator_url = "http://localhost:50051"
+fetch_interval = 12
+
+[sources]
+enabled = ["kraken"]
+
+[kraken]
+api_url = "https://api.kraken.com/0/public/Ticker"
+pair = "XBTUSD"
+timeout = 10
+max_retries = 3
+
+[logging]
+level = "info"

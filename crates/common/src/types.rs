@@ -1,6 +1,6 @@
 //! Common types for Oracle VM
 
-use bitcoin::{Address, Network, PublicKey};
+use bitcoin::PublicKey;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

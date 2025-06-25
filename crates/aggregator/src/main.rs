@@ -47,32 +47,41 @@ impl AggregatorService {
         }
     }
     
-    /// 집계된 가격 계산 (최근 5분 내 데이터 중앙값)
+    /// 집계된 가격 계산 (최근 1분 내 데이터 평균값)
     fn calculate_aggregated_price(&self) -> Option<f64> {
         let price_data = self.price_data.lock().unwrap();
         let now = Utc::now().timestamp() as u64;
         
-        // 최근 5분 내 데이터만 사용
-        let recent_prices: Vec<f64> = price_data
-            .iter()
-            .filter(|data| now - data.received_at <= 300) // 5분 = 300초
-            .map(|data| data.price)
-            .collect();
+        // 각 노드의 최신 가격만 수집 (최근 1분 내)
+        let mut latest_per_node: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
         
-        if recent_prices.is_empty() {
+        for data in price_data.iter() {
+            // 최근 1분 내 데이터만 사용
+            if now - data.received_at <= 60 {  // 1분 = 60초
+                // 각 노드의 최신 가격만 유지
+                latest_per_node
+                    .entry(data.node_id.clone())
+                    .and_modify(|existing_price| {
+                        // 더 최신 데이터라면 업데이트
+                        if data.received_at > *existing_price as u64 {
+                            *existing_price = data.price;
+                        }
+                    })
+                    .or_insert(data.price);
+            }
+        }
+        
+        if latest_per_node.is_empty() {
             return None;
         }
         
-        // 중앙값 계산
-        let mut sorted_prices = recent_prices;
-        sorted_prices.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        // 평균값 계산
+        let prices: Vec<f64> = latest_per_node.values().cloned().collect();
+        let average = prices.iter().sum::<f64>() / prices.len() as f64;
         
-        let len = sorted_prices.len();
-        if len % 2 == 0 {
-            Some((sorted_prices[len / 2 - 1] + sorted_prices[len / 2]) / 2.0)
-        } else {
-            Some(sorted_prices[len / 2])
-        }
+        info!("📊 Calculated average from {} nodes: ${:.2}", prices.len(), average);
+        
+        Some(average)
     }
     
     /// 활성 노드 업데이트
@@ -81,8 +90,8 @@ impl AggregatorService {
         let now = Utc::now().timestamp() as u64;
         active_nodes.insert(node_id.to_string(), now);
         
-        // 5분 이상 비활성 노드 제거
-        active_nodes.retain(|_, &mut last_seen| now - last_seen <= 300);
+        // 2분 이상 비활성 노드 제거 (1분 수집 + 1분 여유)
+        active_nodes.retain(|_, &mut last_seen| now - last_seen <= 120);
     }
 }
 
