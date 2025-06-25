@@ -242,5 +242,3 @@ oracle_vm/
 MIT License - see [LICENSE](LICENSE) for details
 
 ---
-
-**🤖 Generated with [Claude Code](https://claude.ai/code)**
