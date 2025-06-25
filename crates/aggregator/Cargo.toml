@@ -23,6 +23,8 @@ clap = { workspace = true }
 # gRPC
 tonic = { workspace = true }
 prost = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
 
 # Error handling
 anyhow = { workspace = true }

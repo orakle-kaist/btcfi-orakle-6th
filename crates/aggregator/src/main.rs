@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tonic::{transport::Server, Request, Response, Status};
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 use chrono::Utc;
 
 // gRPC 서비스 정의 (tonic-build로 자동 생성됨)
@@ -16,6 +16,9 @@ use oracle::{
     ConfigRequest, ConfigResponse, GetPriceRequest, GetPriceResponse,
     AggregatedPriceUpdate, PriceDataPoint,
 };
+
+use futures::Stream;
+use std::pin::Pin;
 
 /// 가격 데이터 저장 구조체
 #[derive(Clone, Debug)]
@@ -85,6 +88,8 @@ impl AggregatorService {
 
 #[tonic::async_trait]
 impl OracleService for AggregatorService {
+    /// 스트림 타입 정의
+    type StreamPricesStream = Pin<Box<dyn Stream<Item = Result<AggregatedPriceUpdate, Status>> + Send>>;
     /// 가격 데이터 제출 처리
     async fn submit_price(
         &self,
@@ -238,9 +243,6 @@ impl OracleService for AggregatorService {
         Err(Status::unimplemented("Stream prices not implemented yet"))
     }
 }
-
-// 스트림 타입 정의 (미구현)
-type StreamPricesStream = std::pin::Pin<Box<dyn futures::Stream<Item = Result<AggregatedPriceUpdate, Status>> + Send>>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
