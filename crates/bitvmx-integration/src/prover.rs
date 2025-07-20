@@ -203,7 +203,7 @@ impl BitVMXProver {
         parameters.insert("settlement_price".to_string(), serde_json::Value::Number(settlement.settlement_price.into()));
         
         let request = SetupRequest {
-            program_id: "option-settlement".to_string(),
+            program_id: "option-verification-program".to_string(), // Use existing Rust RISC-V program
             network: "testnet".to_string(), // TODO: Make configurable
             parameters,
         };
@@ -314,7 +314,8 @@ impl BitVMXProver {
         Ok(proof_response)
     }
 
-    /// Prepare settlement input data as hex string
+    /// Prepare settlement input data as hex string  
+    /// This must exactly match the VerificationHeader and data structs in option_verification_program/src/main.rs
     fn prepare_settlement_input_hex(
         &self,
         settlement: &OptionSettlement,
@@ -322,36 +323,39 @@ impl BitVMXProver {
     ) -> Result<String> {
         let mut input = Vec::new();
         
-        // Option data structure (64 bytes) - matches settlement_program/src/main.rs
-        input.extend_from_slice(&[0u8]); // option_type: Call=0, Put=1
-        input.extend_from_slice(&[0u8; 7]); // padding
-        input.extend_from_slice(&52000_00000000u64.to_be_bytes()); // strike_price (TODO: extract from settlement)
-        input.extend_from_slice(&settlement.settlement_timestamp.to_be_bytes()); // expiry
-        input.extend_from_slice(&100000u64.to_be_bytes()); // premium_paid (TODO: extract from settlement)
-        input.extend_from_slice(&[0u8; 20]); // buyer_address (TODO: decode from settlement.buyer_address)
-        input.extend_from_slice(&[0u8; 12]); // padding to 64 bytes
+        // VerificationHeader (16 bytes)
+        input.push(2u8); // verification_type: Settlement = 2
+        input.push(0u8); // option_type: Call=0, Put=1 (assuming Call for now)  
+        input.extend_from_slice(&[0u8; 14]); // _padding
         
-        // Oracle consensus data (256 bytes)
-        input.extend_from_slice(&settlement.settlement_price.to_be_bytes()); // btc_price
+        // SettlementData (64 bytes) - legacy format for compatibility
+        input.extend_from_slice(&52000_00000000u64.to_be_bytes()); // strike_price in satoshis (TODO: extract from settlement)
+        input.extend_from_slice(&settlement.settlement_timestamp.to_be_bytes()); // expiry_timestamp
+        input.extend_from_slice(&100000u64.to_be_bytes()); // premium_paid in satoshis (TODO: extract from settlement)
+        input.extend_from_slice(&[0u8; 20]); // buyer_address hash (TODO: decode from settlement.buyer_address)
+        input.extend_from_slice(&[0u8; 12]); // _padding to reach 64 bytes
+        
+        // OracleData (256 bytes) - same format as before
+        input.extend_from_slice(&settlement.settlement_price.to_be_bytes()); // btc_price in satoshis per USD
         input.extend_from_slice(&settlement.settlement_timestamp.to_be_bytes()); // timestamp
-        input.push(3u8); // consensus_count (3 oracles)
-        input.extend_from_slice(&[0u8; 7]); // padding
+        input.push(3u8); // consensus_count (number of oracles in consensus)
+        input.extend_from_slice(&[0u8; 7]); // _padding1
         
         // Oracle signatures (3 * 64 = 192 bytes)
         if oracle_signatures.len() >= 192 {
             input.extend_from_slice(&oracle_signatures[0..192]);
         } else {
-            // Mock oracle signatures for development
-            input.extend_from_slice(&[1u8; 64]); // Mock oracle 1 signature
-            input.extend_from_slice(&[2u8; 64]); // Mock oracle 2 signature
-            input.extend_from_slice(&[3u8; 64]); // Mock oracle 3 signature
+            // Mock oracle signatures for development/testing
+            input.extend_from_slice(&[1u8; 64]); // oracle1_sig
+            input.extend_from_slice(&[2u8; 64]); // oracle2_sig
+            input.extend_from_slice(&[3u8; 64]); // oracle3_sig
         }
         
-        // Padding to complete 256 bytes oracle data
+        // _padding2 to complete OracleData to 256 bytes
         input.extend_from_slice(&[0u8; 40]);
         
-        // Ensure total input is exactly 320 bytes (64 + 256)
-        input.resize(320, 0);
+        // Verify total input is exactly 336 bytes (16 + 64 + 256)
+        assert_eq!(input.len(), 336, "Verification input must be exactly 336 bytes");
         
         Ok(hex::encode(input))
     }
