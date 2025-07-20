@@ -1,9 +1,9 @@
 //! DeFi primitives for Oracle VM
 
-pub mod vaults;
 pub mod options;
+pub mod vaults;
 pub mod rwa;
 
-pub use vaults::*;
-pub use options::*;
-pub use rwa::*;
+// Re-export commonly used types
+pub use options::{OptionType, OptionStatus, BlackScholesPricing, OptionContract};
+pub use vaults::OptionVault;
