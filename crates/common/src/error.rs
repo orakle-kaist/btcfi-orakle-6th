@@ -28,11 +28,20 @@ pub enum OracleVmError {
     #[error("Invalid data: {0}")]
     InvalidData(String),
     
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+    
     #[error("Timeout error")]
     Timeout,
     
     #[error("Internal error: {0}")]
     Internal(String),
+}
+
+impl From<&str> for OracleVmError {
+    fn from(err: &str) -> Self {
+        OracleVmError::InvalidInput(err.to_string())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, OracleVmError>;
