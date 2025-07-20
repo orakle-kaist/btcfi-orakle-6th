@@ -1,5 +1,6 @@
 //! DeFi primitives for Oracle VM
 
+pub mod error;
 pub mod options;
 pub mod vaults;
 

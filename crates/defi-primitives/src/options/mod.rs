@@ -5,6 +5,7 @@ pub mod pricing;
 pub mod contract;
 pub mod factory;
 pub mod transaction;
+pub mod buy_service;
 
 pub use types::{OptionType, OptionStatus};
 pub use pricing::BlackScholesPricing;
@@ -16,4 +17,8 @@ pub use factory::{
 pub use transaction::{
     TxType, CreateOptionTx, BuyOptionTx, SettleOptionTx, ChallengeTx, 
     ChallengeType, OptionTransaction, PROTOCOL_ID
+};
+pub use buy_service::{
+    OptionBuyService, BuyOptionRequest, BuyOptionResponse, 
+    BuyValidationError, UserPosition
 };

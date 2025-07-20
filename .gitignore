@@ -82,3 +82,8 @@ Cargo.lock
 # Project-specific
 CLAUDE.md
 temp_docs/
+
+# BitvmX related directories (external repos)
+bitvmx_protocol/
+rust-bitcoin-script-stack/
+BitVMX-CPU/

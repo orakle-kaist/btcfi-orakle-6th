@@ -50,6 +50,29 @@ pub enum ProductStatus {
     Cancelled,   // Manually cancelled by operator
 }
 
+impl OptionProduct {
+    /// Check if product is active and available for purchase
+    pub fn is_active(&self) -> bool {
+        let now = chrono::Utc::now().timestamp() as u64;
+        matches!(self.status, ProductStatus::Active) &&
+        self.create_tx.expiry > now &&
+        self.units_sold < self.max_units
+    }
+
+    /// Get available units for purchase
+    pub fn available_units(&self) -> u32 {
+        self.max_units.saturating_sub(self.units_sold)
+    }
+
+    /// Check if option is in the money at current price
+    pub fn is_itm(&self, current_price: f64) -> bool {
+        match self.create_tx.option_type {
+            OptionType::Call => current_price > self.create_tx.strike as f64,
+            OptionType::Put => current_price < self.create_tx.strike as f64,
+        }
+    }
+}
+
 /// Request to create new option product
 #[derive(Debug, Deserialize)]
 pub struct CreateProductRequest {
@@ -282,6 +305,11 @@ impl OptionFactory {
     /// Get product details
     pub fn get_product(&self, option_id: &str) -> Option<&OptionProduct> {
         self.products.get(option_id)
+    }
+
+    /// List all products (wrapper for get_product_list)
+    pub fn list_products(&self, current_btc_price: f64) -> Vec<ProductListItem> {
+        self.get_product_list(current_btc_price)
     }
 
     // Helper methods

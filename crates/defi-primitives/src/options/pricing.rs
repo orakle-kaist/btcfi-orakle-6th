@@ -20,6 +20,28 @@ pub struct BlackScholesPricing {
 }
 
 impl BlackScholesPricing {
+    /// Create a new BlackScholesPricing instance
+    pub fn new(spot: f64, strike: f64, time_to_expiry: f64, risk_free_rate: f64, volatility: f64) -> Self {
+        Self {
+            spot,
+            strike,
+            time_to_expiry,
+            risk_free_rate,
+            volatility,
+        }
+    }
+
+    /// Create with default values for quick initialization
+    pub fn default() -> Self {
+        Self {
+            spot: 50000.0,
+            strike: 52000.0,
+            time_to_expiry: 7.0 / 365.0,
+            risk_free_rate: 0.04,
+            volatility: 0.7,
+        }
+    }
+
     /// Calculate option premium using Black-Scholes model
     pub fn calculate_premium(&self, option_type: OptionType) -> f64 {
         let d1 = self.calculate_d1();
