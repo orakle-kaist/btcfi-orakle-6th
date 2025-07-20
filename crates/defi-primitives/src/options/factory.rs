@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::{info, error, warn};
+use bitcoin_client::{BitcoinClient, BitcoinConfig};
 use super::{
     types::OptionType,
     pricing::BlackScholesPricing,
@@ -21,6 +23,8 @@ pub struct OptionFactory {
     pub operator_address: String,
     /// Supported oracle providers
     pub oracle_providers: Vec<String>,
+    /// Bitcoin client for L1 anchoring
+    pub bitcoin_client: Option<BitcoinClient>,
 }
 
 /// Option product registered by service operator
@@ -95,6 +99,18 @@ pub struct CreateProductResponse {
     pub expiry_timestamp: u64,
 }
 
+/// Response after creating and anchoring product to Bitcoin L1
+#[derive(Debug, Serialize)]
+pub struct CreateAndAnchorResponse {
+    pub option_id: String,
+    pub create_tx: CreateOptionTx,
+    pub calculated_premium: f64,
+    pub max_units: u32,
+    pub expiry_timestamp: u64,
+    pub bitcoin_anchor_txid: Option<String>,
+    pub bitvmx_program_hash: String,
+}
+
 /// Public product information for user interface
 #[derive(Debug, Serialize)]
 pub struct ProductListItem {
@@ -131,7 +147,15 @@ impl OptionFactory {
                 "coinbase".to_string(), 
                 "kraken".to_string(),
             ],
+            bitcoin_client: None,
         }
+    }
+
+    /// Create new Option Factory with Bitcoin client for L1 anchoring
+    pub fn new_with_bitcoin(operator_address: String, bitcoin_config: BitcoinConfig) -> Self {
+        let mut factory = Self::new(operator_address);
+        factory.bitcoin_client = Some(BitcoinClient::new(bitcoin_config));
+        factory
     }
 
     /// Create new option product (service operator only)
@@ -209,6 +233,142 @@ impl OptionFactory {
             max_units: request.max_units,
             expiry_timestamp,
         })
+    }
+
+    /// Create option product and anchor to Bitcoin L1 in one transaction
+    pub async fn create_and_anchor(
+        &mut self,
+        request: CreateProductRequest,
+        current_btc_price: f64,
+    ) -> Result<CreateAndAnchorResponse, String> {
+        info!("Creating and anchoring option product: {:?}", request);
+
+        // Step 1: Create product using existing logic
+        let create_response = self.create_product(request, current_btc_price)?;
+        let option_id = &create_response.option_id;
+        let create_tx = &create_response.create_tx;
+
+        // Step 2: Anchor to Bitcoin L1 if client is available
+        let anchor_txid = if let Some(ref bitcoin_client) = self.bitcoin_client {
+            match self.anchor_to_bitcoin(create_tx, bitcoin_client).await {
+                Ok(txid) => {
+                    info!("Successfully anchored option {} to Bitcoin: {}", option_id, txid);
+                    Some(txid)
+                }
+                Err(e) => {
+                    error!("Failed to anchor option {} to Bitcoin: {}", option_id, e);
+                    // Remove the product from registry since anchoring failed
+                    self.products.remove(option_id);
+                    return Err(format!("Failed to anchor to Bitcoin: {}", e));
+                }
+            }
+        } else {
+            warn!("Bitcoin client not configured, skipping L1 anchoring for option {}", option_id);
+            None
+        };
+
+        // Step 3: Generate BitVMX verification program (placeholder for now)
+        let bitvmx_program_hash = self.generate_bitvmx_program(create_tx).await?;
+
+        Ok(CreateAndAnchorResponse {
+            option_id: create_response.option_id,
+            create_tx: create_response.create_tx,
+            calculated_premium: create_response.calculated_premium,
+            max_units: create_response.max_units,
+            expiry_timestamp: create_response.expiry_timestamp,
+            bitcoin_anchor_txid: anchor_txid,
+            bitvmx_program_hash,
+        })
+    }
+
+    /// Anchor option data to Bitcoin L1 using OP_RETURN
+    async fn anchor_to_bitcoin(
+        &self,
+        create_tx: &CreateOptionTx,
+        bitcoin_client: &BitcoinClient,
+    ) -> Result<String, String> {
+        info!("Anchoring option {} to Bitcoin L1", create_tx.option_id);
+
+        // Create simplified OP_RETURN data (28 bytes)
+        let op_return_data = self.serialize_create_tx_for_bitcoin(create_tx)?;
+        
+        info!("OP_RETURN data: {} bytes", op_return_data.len());
+
+        // Send transaction with small amount for change
+        match bitcoin_client.send_op_return_transaction(&op_return_data, Some(0.001)).await {
+            Ok(txid) => {
+                info!("Bitcoin anchoring successful: {}", txid);
+                Ok(txid)
+            }
+            Err(e) => {
+                error!("Bitcoin anchoring failed: {}", e);
+                Err(format!("Bitcoin RPC error: {}", e))
+            }
+        }
+    }
+
+    /// Serialize CREATE transaction to Bitcoin OP_RETURN format (28 bytes)
+    fn serialize_create_tx_for_bitcoin(&self, create_tx: &CreateOptionTx) -> Result<Vec<u8>, String> {
+        let mut data = Vec::new();
+
+        // TX Type (1 byte): CREATE=0
+        data.push(0x00);
+
+        // Option ID (6 bytes): hash the option ID string and take first 6 bytes
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        create_tx.option_id.hash(&mut hasher);
+        let hash = hasher.finish();
+        let hash_bytes = hash.to_be_bytes();
+        data.extend_from_slice(&hash_bytes[..6]);  // Take first 6 bytes
+
+        // Option Type (1 byte): CALL=0, PUT=1
+        let option_type_byte = match create_tx.option_type {
+            OptionType::Call => 0x00,
+            OptionType::Put => 0x01,
+        };
+        data.push(option_type_byte);
+
+        // Strike (8 bytes, big endian)
+        let strike_sats = (create_tx.strike as u64) * 100_000_000;
+        data.extend_from_slice(&strike_sats.to_be_bytes());
+
+        // Expiry (8 bytes, big endian)
+        data.extend_from_slice(&create_tx.expiry.to_be_bytes());
+
+        // Unit (4 bytes): 1.0 as IEEE 754 float
+        data.extend_from_slice(&1.0f32.to_be_bytes());
+
+        if data.len() != 28 {
+            return Err(format!("Invalid OP_RETURN data length: {} (expected 28)", data.len()));
+        }
+
+        Ok(data)
+    }
+
+    /// Generate BitVMX verification program for option product
+    async fn generate_bitvmx_program(&self, create_tx: &CreateOptionTx) -> Result<String, String> {
+        // Placeholder implementation - integrate with actual BitVMX protocol
+        let program_input = format!(
+            "option_id={},strike={},expiry={},type={:?}",
+            create_tx.option_id,
+            create_tx.strike,
+            create_tx.expiry,
+            create_tx.option_type
+        );
+        
+        // Generate deterministic hash for now
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        program_input.hash(&mut hasher);
+        let program_hash = format!("{:016x}", hasher.finish());
+        
+        info!("Generated BitVMX program hash: {}", program_hash);
+        Ok(program_hash)
     }
 
     /// Get all active products for user interface

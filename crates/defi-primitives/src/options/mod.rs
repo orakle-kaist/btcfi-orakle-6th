@@ -22,3 +22,6 @@ pub use buy_service::{
     OptionBuyService, BuyOptionRequest, BuyOptionResponse, 
     BuyValidationError, UserPosition
 };
+
+#[cfg(test)]
+mod test_factory_integration;

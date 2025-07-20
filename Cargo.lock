@@ -945,8 +945,10 @@ dependencies = [
 name = "defi-primitives"
 version = "0.1.0"
 dependencies = [
+ "bitcoin-client",
  "chrono",
  "flate2",
+ "hex",
  "md5",
  "oracle-vm-common",
  "serde",

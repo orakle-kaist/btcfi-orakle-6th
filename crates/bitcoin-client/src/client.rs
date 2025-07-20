@@ -160,11 +160,11 @@ impl BitcoinClient {
     ) -> Result<String> {
         tracing::info!("Creating OP_RETURN transaction with {} bytes", data.len());
 
-        // Create OP_RETURN script
-        let _op_return_script = Builder::new()
-            .push_opcode(OP_RETURN)
-            .push_slice(data.as_ref())
-            .into_script();
+        // Create OP_RETURN script (for reference, not used in RPC approach)
+        // let _op_return_script = Builder::new()
+        //     .push_opcode(OP_RETURN)
+        //     .push_slice(data)
+        //     .into_script();
 
         // Get a new address to send change to
         let change_address = self.get_new_address(Some("op_return_change")).await?;

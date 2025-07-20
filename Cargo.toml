@@ -76,21 +76,9 @@ clap = { version = "4.4", features = ["derive"] }
 # Metrics
 prometheus = "0.13"
 
-# Hashing
-sha2 = "0.10"
+# Hashing (already defined above)
 
-[[example]]
-name = "register_option_testnet"
-path = "examples/register_option_testnet.rs"
 
-[dependencies]
-# Example dependencies
-tokio = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-chrono = { workspace = true }
-sha2 = { workspace = true }
-hex = "0.4"
 
 # Local crates
 defi-primitives = { path = "crates/defi-primitives" }
