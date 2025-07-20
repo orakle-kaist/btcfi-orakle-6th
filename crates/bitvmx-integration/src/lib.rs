@@ -1,5 +1,7 @@
 //! BitVMX integration for Oracle VM
 
+pub mod error;
+pub mod presign;
 pub mod prover;
 pub mod verifier;
 pub mod vm;

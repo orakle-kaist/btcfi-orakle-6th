@@ -9,6 +9,8 @@ use tracing::{info, error};
 
 mod committer;
 mod config;
+mod error;
+mod hybrid_anchor;
 
 use committer::BitcoinCommitter;
 use config::CommitterConfig;

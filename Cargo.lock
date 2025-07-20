@@ -573,6 +573,7 @@ dependencies = [
  "hex",
  "oracle-vm-common",
  "reqwest",
+ "secp256k1 0.28.2",
  "serde",
  "serde_json",
  "sha2",
@@ -713,6 +714,7 @@ version = "0.1.0"
 dependencies = [
  "bitcoin 0.31.2",
  "bitcoincore-rpc",
+ "bitvmx-integration",
  "chrono",
  "clap",
  "defi-primitives",

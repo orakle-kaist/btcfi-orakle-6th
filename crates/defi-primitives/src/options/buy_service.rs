@@ -31,6 +31,17 @@ pub struct BuyOptionResponse {
     pub total_premium: f64,
     pub estimated_pnl: Option<f64>, // If option is in-the-money
     pub pool_balance_after: f64,
+    pub presigned_settlement: Option<PresignedSettlementInfo>, // BitVMX guarantee
+}
+
+/// Pre-signed settlement information for user
+#[derive(Debug, Serialize)]
+pub struct PresignedSettlementInfo {
+    pub settlement_txid: String,
+    pub program_hash: String,
+    pub max_payout: f64,
+    pub expiry: u64,
+    pub verification_url: String,
 }
 
 /// Buy option validation error
@@ -147,6 +158,7 @@ impl OptionBuyService {
             total_premium,
             estimated_pnl,
             pool_balance_after: self.pool_balance,
+            presigned_settlement: None, // TODO: Integrate BitVMX pre-sign
         })
     }
 
