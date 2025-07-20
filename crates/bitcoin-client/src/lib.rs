@@ -4,4 +4,4 @@ pub mod client;
 pub mod scripts;
 pub mod utxo;
 
-pub use client::*;
+pub use client::{BitcoinClient, BitcoinConfig, TransactionInfo, UtxoInfo};

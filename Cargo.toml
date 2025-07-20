@@ -8,6 +8,9 @@ members = [
     "crates/defi-primitives",
     "crates/common",
 ]
+exclude = [
+    "option_verification_program",
+]
 resolver = "2"
 
 [workspace.package]
@@ -72,4 +75,26 @@ clap = { version = "4.4", features = ["derive"] }
 
 # Metrics
 prometheus = "0.13"
+
+# Hashing
+sha2 = "0.10"
+
+[[example]]
+name = "register_option_testnet"
+path = "examples/register_option_testnet.rs"
+
+[dependencies]
+# Example dependencies
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+hex = "0.4"
+
+# Local crates
+defi-primitives = { path = "crates/defi-primitives" }
+bitcoin-client = { path = "crates/bitcoin-client" }
+bitvmx-integration = { path = "crates/bitvmx-integration" }
+committer = { path = "crates/committer" }
 

@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  bitcoin-regtest:
+    image: kylemanna/bitcoind:latest
+    container_name: bitcoin-regtest
+    ports:
+      - "18443:18443"  # regtest RPC port
+      - "18444:18444"  # regtest P2P port
+    volumes:
+      - bitcoin_data:/bitcoin/.bitcoin
+      - ./docker/bitcoin.conf:/bitcoin/.bitcoin/bitcoin.conf
+    command: >
+      bitcoind
+      -regtest
+      -server=1
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0:18443
+      -printtoconsole=1
+    restart: unless-stopped
+    environment:
+      - BITCOIN_DATA=/bitcoin/.bitcoin
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcconnect=localhost", "-rpcport=18443", "-rpcuser=bitcoinrpc", "-rpcpassword=rpcpassword", "getblockchaininfo"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  bitcoin-testnet:
+    image: kylemanna/bitcoind:latest
+    container_name: bitcoin-testnet
+    ports:
+      - "18332:18332"  # testnet RPC port
+      - "18333:18333"  # testnet P2P port
+    volumes:
+      - bitcoin_testnet_data:/bitcoin/.bitcoin
+      - ./docker/bitcoin-testnet.conf:/bitcoin/.bitcoin/bitcoin.conf
+    command: >
+      bitcoind
+      -testnet
+      -server=1
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0:18332
+      -printtoconsole=1
+    restart: unless-stopped
+    profiles:
+      - testnet
+    environment:
+      - BITCOIN_DATA=/bitcoin/.bitcoin
+
+volumes:
+  bitcoin_data:
+    driver: local
+  bitcoin_testnet_data:
+    driver: local
