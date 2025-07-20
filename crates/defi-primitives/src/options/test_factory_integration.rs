@@ -130,3 +130,27 @@ fn test_factory_bitcoin_integration() {
     assert!(factory.bitcoin_client.is_some());
     println!("✅ Factory with Bitcoin client created successfully");
 }
+
+#[test]
+fn test_factory_full_integration() {
+    let _ = tracing_subscriber::fmt::try_init();
+
+    // Test creating factory with full BitVMX and Bitcoin integration
+    let bitcoin_config = BitcoinConfig {
+        network: Network::Regtest,
+        rpc_url: "http://localhost:18443".to_string(),
+        rpc_user: "bitcoinrpc".to_string(),
+        rpc_password: "rpcpassword".to_string(),
+        wallet_name: Some("testwallet".to_string()),
+    };
+
+    let factory = OptionFactory::new_with_full_integration(
+        "bc1q_test_operator_full".to_string(),
+        bitcoin_config,
+    );
+
+    // Verify both Bitcoin client and BitVMX verifier are configured
+    assert!(factory.bitcoin_client.is_some());
+    assert!(factory.bitvmx_verifier.is_some());
+    println!("✅ Factory with full BitVMX + Bitcoin integration created successfully");
+}

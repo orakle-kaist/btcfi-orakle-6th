@@ -6,6 +6,7 @@ pub mod contract;
 pub mod factory;
 pub mod transaction;
 pub mod buy_service;
+pub mod bitvmx_integration;
 
 pub use types::{OptionType, OptionStatus};
 pub use pricing::BlackScholesPricing;
@@ -21,6 +22,9 @@ pub use transaction::{
 pub use buy_service::{
     OptionBuyService, BuyOptionRequest, BuyOptionResponse, 
     BuyValidationError, UserPosition
+};
+pub use bitvmx_integration::{
+    BitVMXClient, BitVMXOptionVerifier, BitVMXSetupResponse
 };
 
 #[cfg(test)]

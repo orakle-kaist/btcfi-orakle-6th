@@ -11,6 +11,7 @@ use super::{
     types::OptionType,
     pricing::BlackScholesPricing,
     transaction::{CreateOptionTx, TxType},
+    bitvmx_integration::BitVMXOptionVerifier,
 };
 
 /// Option Factory for managing product creation and lifecycle
@@ -25,6 +26,8 @@ pub struct OptionFactory {
     pub oracle_providers: Vec<String>,
     /// Bitcoin client for L1 anchoring
     pub bitcoin_client: Option<BitcoinClient>,
+    /// BitVMX verifier for fraud-proof protocols
+    pub bitvmx_verifier: Option<BitVMXOptionVerifier>,
 }
 
 /// Option product registered by service operator
@@ -148,6 +151,7 @@ impl OptionFactory {
                 "kraken".to_string(),
             ],
             bitcoin_client: None,
+            bitvmx_verifier: None,
         }
     }
 
@@ -155,6 +159,17 @@ impl OptionFactory {
     pub fn new_with_bitcoin(operator_address: String, bitcoin_config: BitcoinConfig) -> Self {
         let mut factory = Self::new(operator_address);
         factory.bitcoin_client = Some(BitcoinClient::new(bitcoin_config));
+        factory
+    }
+
+    /// Create new Option Factory with full BitVMX and Bitcoin integration
+    pub fn new_with_full_integration(
+        operator_address: String, 
+        bitcoin_config: BitcoinConfig
+    ) -> Self {
+        let mut factory = Self::new(operator_address);
+        factory.bitcoin_client = Some(BitcoinClient::new(bitcoin_config));
+        factory.bitvmx_verifier = Some(BitVMXOptionVerifier::new());
         factory
     }
 
@@ -349,8 +364,23 @@ impl OptionFactory {
     }
 
     /// Generate BitVMX verification program for option product
-    async fn generate_bitvmx_program(&self, create_tx: &CreateOptionTx) -> Result<String, String> {
-        // Placeholder implementation - integrate with actual BitVMX protocol
+    async fn generate_bitvmx_program(&mut self, create_tx: &CreateOptionTx) -> Result<String, String> {
+        info!("🔧 Generating BitVMX verification program for option: {}", create_tx.option_id);
+
+        // Use BitVMX verifier if available
+        if let Some(ref mut verifier) = self.bitvmx_verifier {
+            match verifier.register_option_product(create_tx).await {
+                Ok(program_hash) => {
+                    info!("✅ BitVMX protocol registration successful: {}", program_hash);
+                    return Ok(program_hash);
+                }
+                Err(e) => {
+                    warn!("⚠️ BitVMX registration failed, using fallback: {}", e);
+                }
+            }
+        }
+
+        // Fallback: generate deterministic hash
         let program_input = format!(
             "option_id={},strike={},expiry={},type={:?}",
             create_tx.option_id,
@@ -359,15 +389,14 @@ impl OptionFactory {
             create_tx.option_type
         );
         
-        // Generate deterministic hash for now
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
         
         let mut hasher = DefaultHasher::new();
         program_input.hash(&mut hasher);
-        let program_hash = format!("{:016x}", hasher.finish());
+        let program_hash = format!("fallback_{:016x}", hasher.finish());
         
-        info!("Generated BitVMX program hash: {}", program_hash);
+        info!("Generated fallback BitVMX program hash: {}", program_hash);
         Ok(program_hash)
     }
 

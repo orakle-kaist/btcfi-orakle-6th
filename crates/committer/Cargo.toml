@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 oracle-vm-common = { path = "../common" }
 defi-primitives = { path = "../defi-primitives" }
-bitvmx-integration = { path = "../bitvmx-integration" }
+# bitvmx-integration = { path = "../bitvmx-integration" }
 
 tokio = { workspace = true }
 bitcoin = { workspace = true }
