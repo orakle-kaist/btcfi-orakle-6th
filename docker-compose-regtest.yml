@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  bitcoin-regtest:
+    image: kylemanna/bitcoind:latest
+    container_name: bitcoin-regtest
+    ports:
+      - "18443:18443"  # Regtest RPC port
+      - "18444:18444"  # Regtest P2P port
+    volumes:
+      - bitcoin-regtest-data:/opt/bitcoin/.bitcoin
+    environment:
+      - BITCOIN_NETWORK=regtest
+    command: >
+      bitcoind
+      -regtest
+      -rpcuser=bitcoin
+      -rpcpassword=bitcoin
+      -rpcallowip=0.0.0.0/0
+      -rpcport=18443
+      -rpcbind=0.0.0.0:18443
+      -port=18444
+      -txindex=1
+      -server=1
+      -rest=1
+      -daemon=0
+      -printtoconsole=1
+      -fallbackfee=0.00001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=bitcoin", "-rpcpassword=bitcoin", "getblockchaininfo"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  bitcoin-regtest-data:
+    driver: local

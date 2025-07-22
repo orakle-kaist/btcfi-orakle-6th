@@ -42,8 +42,19 @@ impl BlackScholesPricing {
         }
     }
 
-    /// Calculate option premium using Black-Scholes model
+    /// Calculate option premium using Black-Scholes model with transaction costs
     pub fn calculate_premium(&self, option_type: OptionType) -> f64 {
+        let base_premium = self.calculate_base_premium(option_type);
+        
+        // 트랜잭션 비용 추가
+        let anchoring_cost = 0.0002; // CREATE + BitVMX 앵커링 비용
+        let service_fee = base_premium * 0.03; // 3% 서비스 수수료
+        
+        base_premium + anchoring_cost + service_fee
+    }
+
+    /// Calculate base premium without transaction costs (internal use)
+    pub fn calculate_base_premium(&self, option_type: OptionType) -> f64 {
         let d1 = self.calculate_d1();
         let d2 = self.calculate_d2();
         
