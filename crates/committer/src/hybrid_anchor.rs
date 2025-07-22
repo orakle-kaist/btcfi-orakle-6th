@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use bitcoin::{Transaction, TxOut, Script};
 use defi_primitives::options::{CreateOptionTx, BuyOptionTx, SettleOptionTx};
-use bitvmx_integration::presign::{PreSignedSettlement, OracleData};
+// use bitvmx_integration::presign::{PreSignedSettlement, OracleData};
 use crate::committer::BitcoinCommitter;
 use crate::error::Result;
 
@@ -53,8 +53,8 @@ pub struct HybridAnchorService {
     /// Bitcoin committer for OP_RETURN
     bitcoin_committer: BitcoinCommitter,
     
-    /// BitVMX integration
-    bitvmx_client: bitvmx_integration::prover::BitVMXProver,
+    // /// BitVMX integration
+    // bitvmx_client: bitvmx_integration::prover::BitVMXProver,
     
     /// Record storage (could be database)
     records: std::sync::Mutex<Vec<HybridAnchorRecord>>,
@@ -64,11 +64,11 @@ impl HybridAnchorService {
     /// Create new hybrid anchor service
     pub fn new(
         bitcoin_committer: BitcoinCommitter,
-        bitvmx_client: bitvmx_integration::prover::BitVMXProver,
+        // bitvmx_client: bitvmx_integration::prover::BitVMXProver,
     ) -> Self {
         Self {
             bitcoin_committer,
-            bitvmx_client,
+            // bitvmx_client,
             records: std::sync::Mutex::new(Vec::new()),
         }
     }

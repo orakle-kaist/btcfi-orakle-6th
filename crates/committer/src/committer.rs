@@ -3,10 +3,11 @@
 //! Handles OP_RETURN transaction creation and broadcasting for option anchoring.
 
 use bitcoin::{
-    Network, OutPoint, ScriptBuf, Transaction, TxIn, TxOut, Witness,
+    Network, OutPoint, ScriptBuf, Transaction, TxIn, TxOut, Witness, Amount, Txid,
     absolute::LockTime, transaction::Version,
     script::{PushBytesBuf, Builder as ScriptBuilder},
 };
+use std::str::FromStr;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn, error, debug};
@@ -138,7 +139,8 @@ impl BitcoinCommitter {
         let bitcoin_tx = self.create_op_return_transaction(&op_return_data).await?;
         
         // Broadcast transaction
-        let txid = self.rpc_client.send_raw_transaction(&bitcoin_tx)?;
+        let tx_hex = bitcoin::consensus::encode::serialize_hex(&bitcoin_tx);
+        let txid = self.rpc_client.send_raw_transaction(tx_hex)?;
         
         info!("📡 Broadcasted Bitcoin transaction: {}", txid);
         
@@ -171,11 +173,11 @@ impl BitcoinCommitter {
         let estimated_vbytes = 300;
         let fee_amount = bitcoin::Amount::from_sat(self.config.fee_rate * estimated_vbytes);
         
-        if input_amount <= fee_amount {
+        if input_amount.to_sat() <= fee_amount.to_sat() {
             return Err("Insufficient funds for transaction fees".into());
         }
         
-        let change_amount = input_amount - fee_amount;
+        let change_amount = Amount::from_sat(input_amount.to_sat() - fee_amount.to_sat());
         
         // Create transaction inputs
         let outpoint = OutPoint::new(utxo.txid, utxo.vout);
@@ -213,8 +215,9 @@ impl BitcoinCommitter {
         };
         
         // Sign transaction
+        let tx_hex = bitcoin::consensus::encode::serialize_hex(&transaction);
         let signed_tx = self.rpc_client.sign_raw_transaction_with_wallet(
-            &transaction, 
+            tx_hex, 
             None, 
             None
         )?;
@@ -223,7 +226,10 @@ impl BitcoinCommitter {
             return Err("Failed to sign transaction".into());
         }
         
-        Ok(signed_tx.transaction()?)
+        // Deserialize the signed transaction
+        let tx_bytes = hex::decode(&signed_tx.hex)?;
+        let signed_transaction: Transaction = bitcoin::consensus::deserialize(&tx_bytes)?;
+        Ok(signed_transaction)
     }
     
     /// Serialize option transaction for OP_RETURN (compressed)

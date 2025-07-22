@@ -80,9 +80,7 @@ impl ProductionOptionService {
 
         let factory = OptionFactory::new_with_full_integration(
             "bc1q_production_operator".to_string(),
-            vec!["binance".to_string(), "coinbase".to_string()],
-            Some(BitcoinClient::new(bitcoin_config)),
-            None,
+            bitcoin_config,
         );
 
         Self {

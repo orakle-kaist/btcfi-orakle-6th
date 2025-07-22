@@ -3,6 +3,7 @@ use defi_primitives::options::{
     types::OptionType,
     bitvmx_integration::{BitVMXOptionVerifier, BitVMXSessionStatus},
 };
+use bitcoin_client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,12 +14,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Setup BitVMX verifier
     let mut bitvmx_verifier = BitVMXOptionVerifier::new();
 
-    // 2. Create Option Factory with BitVMX only
+    // 2. Create Option Factory with BitVMX and Bitcoin
+    let bitcoin_config = bitcoin_client::BitcoinConfig {
+        rpc_url: "http://localhost:18443".to_string(),
+        rpc_user: "bitcoin".to_string(),
+        rpc_password: "bitcoin".to_string(),
+        network: bitcoin_client::Network::Regtest,
+        wallet_name: Some("default".to_string()),
+    };
+    
     let mut factory = OptionFactory::new_with_full_integration(
         "bc1q_test_operator".to_string(),
-        vec!["binance".to_string(), "coinbase".to_string()],
-        None, // No Bitcoin client - focus on BitVMX
-        Some(bitvmx_verifier),
+        bitcoin_config,
     );
 
     // 3. Create test option product

@@ -62,9 +62,7 @@ pub async fn create_option_handler(
     // OptionFactory 초기화 (Bitcoin + BitVMX 통합)
     let mut factory = OptionFactory::new_with_full_integration(
         "bc1q_service_operator".to_string(),
-        vec!["binance".to_string(), "coinbase".to_string(), "kraken".to_string()],
-        Some(BitcoinClient::new(bitcoin_config)),
-        None, // BitVMX 클라이언트는 나중에
+        bitcoin_config,
     );
 
     // 현재 BTC 가격 (실제로는 오라클에서 가져와야 함)

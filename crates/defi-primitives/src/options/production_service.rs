@@ -177,11 +177,17 @@ impl ProductionOptionService {
         };
 
         // Create option factory with full integration
+        let bitcoin_config = bitcoin_client::BitcoinConfig {
+            rpc_url: "http://localhost:18443".to_string(),
+            rpc_user: "bitcoin".to_string(),
+            rpc_password: "bitcoin".to_string(),
+            network: bitcoin_client::Network::Regtest,
+            wallet_name: Some("default".to_string()),
+        };
+        
         let factory = OptionFactory::new_with_full_integration(
             operator_address.clone(),
-            config.oracle_providers.clone(),
-            bitcoin_client,
-            bitvmx_verifier,
+            bitcoin_config,
         );
 
         info!("✅ Production Option Service initialized successfully");
