@@ -148,11 +148,17 @@ fn test_factory_full_integration() {
     let bitcoin_client = BitcoinClient::new(bitcoin_config);
     let bitvmx_verifier = BitVMXOptionVerifier::new();
     
+    let bitcoin_config = BitcoinConfig {
+        network: Network::Regtest,
+        rpc_url: "http://localhost:18443".to_string(),
+        rpc_user: "bitcoinrpc".to_string(),
+        rpc_password: "rpcpassword".to_string(),
+        wallet_name: Some("testwallet".to_string()),
+    };
+
     let factory = OptionFactory::new_with_full_integration(
         "bc1q_test_operator_full".to_string(),
-        vec!["oracle1".to_string()],
-        Some(bitcoin_client),
-        Some(bitvmx_verifier),
+        bitcoin_config,
     );
 
     // Verify both Bitcoin client and BitVMX verifier are configured
@@ -184,11 +190,17 @@ async fn test_full_bitvmx_integration() {
     );
     
     // Create factory with both integrations
+    let bitcoin_config2 = BitcoinConfig {
+        network: Network::Regtest,
+        rpc_url: "http://localhost:18443".to_string(),
+        rpc_user: "bitcoinrpc".to_string(),
+        rpc_password: "rpcpassword".to_string(),
+        wallet_name: Some("testwallet".to_string()),
+    };
+
     let mut factory = OptionFactory::new_with_full_integration(
         "btc_operator_integration_test".to_string(),
-        vec!["oracle1".to_string()],
-        Some(bitcoin_client),
-        Some(bitvmx_verifier),
+        bitcoin_config2,
     );
     
     let request = CreateProductRequest {

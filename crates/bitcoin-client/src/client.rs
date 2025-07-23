@@ -31,6 +31,7 @@ impl Default for BitcoinConfig {
 }
 
 /// Bitcoin RPC client
+#[derive(Clone)]
 pub struct BitcoinClient {
     config: BitcoinConfig,
     client: reqwest::Client,

@@ -9,6 +9,7 @@ members = [
     "crates/common",
     "crates/option-api-server",
 ]
+
 exclude = [
     "option_verification_program",
 ]
@@ -56,6 +57,7 @@ rocksdb = "0.21"
 # Logging
 tracing = "0.1"
 tracing-subscriber = "0.3"
+env_logger = "0.10"
 
 # Error handling
 thiserror = "1.0"
@@ -85,9 +87,13 @@ prometheus = "0.13"
 warp = "0.3"
 hyper = "0.14"
 
+# Utils
+hex = "0.4"
+
 # Local crates
 defi-primitives = { path = "crates/defi-primitives" }
 bitcoin-client = { path = "crates/bitcoin-client" }
 bitvmx-integration = { path = "crates/bitvmx-integration" }
 committer = { path = "crates/committer" }
 
+# Use bitcoin-client crate for the test

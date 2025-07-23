@@ -20,7 +20,7 @@ pub struct OptionCreator {
 }
 
 /// Simple request to create option product
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct CreateRequest {
     pub option_type: OptionType,  // CALL/PUT
     pub strike: u64,              // Strike price (52000)

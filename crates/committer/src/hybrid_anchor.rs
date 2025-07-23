@@ -4,7 +4,7 @@
 //! to create a trustless option settlement system.
 
 use serde::{Deserialize, Serialize};
-use bitcoin::{Transaction, TxOut, Script};
+use bitcoin::{Transaction, TxOut};
 use defi_primitives::options::{CreateOptionTx, BuyOptionTx, SettleOptionTx};
 // use bitvmx_integration::presign::{PreSignedSettlement, OracleData};
 use crate::committer::BitcoinCommitter;
@@ -352,9 +352,18 @@ impl HybridAnchorService {
     fn extract_op_return_data(&self, tx: &Transaction) -> Result<Vec<u8>> {
         // Extract OP_RETURN data from transaction
         for output in &tx.output {
-            if let Ok(script) = Script::from(output.script_pubkey.clone()) {
-                // Check if it's OP_RETURN
-                // In real implementation, properly parse script
+            let script = &output.script_pubkey;
+            // Check if it's OP_RETURN script
+            if script.is_op_return() {
+                // Extract OP_RETURN data
+                if let Some(data) = script.instructions().nth(1) {
+                    if let Ok(instruction) = data {
+                        if let Some(push_data) = instruction.push_data_len() {
+                            // Return the OP_RETURN payload
+                            return Ok(script.as_bytes()[2..].to_vec());
+                        }
+                    }
+                }
             }
         }
         Ok(vec![])

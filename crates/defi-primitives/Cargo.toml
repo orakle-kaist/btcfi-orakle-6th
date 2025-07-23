@@ -25,3 +25,15 @@ uuid = { version = "1.0", features = ["v4"] }
 [dev-dependencies]
 tokio-test = "0.4"
 tracing-subscriber = { workspace = true }
+
+[[example]]
+name = "run_real_bitvm_option_registration"
+path = "../../examples/run_real_bitvm_option_registration.rs"
+
+[[example]]
+name = "run_simple_bitvm_demo"
+path = "../../examples/run_simple_bitvm_demo.rs"
+
+[[example]]
+name = "quick_bitvm_option_demo"
+path = "../../examples/quick_bitvm_option_demo.rs"
