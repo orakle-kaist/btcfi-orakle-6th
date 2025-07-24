@@ -138,6 +138,42 @@ impl SimpleContractManager {
         Ok(())
     }
 
+    /// 옵션 생성 with OP_RETURN anchoring
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_option_with_anchor(
+        &mut self,
+        option_id: String,
+        option_type: OptionType,
+        strike_price: u64,
+        quantity: u64,
+        premium: u64,
+        expiry_height: u32,
+        user_id: String,
+        anchoring_service: &crate::bitcoin_anchoring::BitcoinAnchoringService,
+    ) -> Result<String> {
+        // 먼저 옵션을 생성
+        self.create_option(
+            option_id.clone(),
+            option_type,
+            strike_price,
+            quantity,
+            premium,
+            expiry_height,
+            user_id,
+        )?;
+
+        // 생성된 옵션을 가져와서 앵커링
+        let option = self.options.get(&option_id)
+            .ok_or_else(|| anyhow::anyhow!("Option not found after creation"))?;
+        
+        // Bitcoin에 앵커링
+        let txid = anchoring_service.anchor_option(option).await?;
+        
+        log::info!("Option {} anchored with txid: {}", option_id, txid);
+        
+        Ok(txid)
+    }
+
     /// 옵션 정산
     pub fn settle_option(&mut self, option_id: &str, spot_price: u64) -> Result<u64> {
         let option = self
