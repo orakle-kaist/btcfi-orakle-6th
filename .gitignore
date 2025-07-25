@@ -129,3 +129,11 @@ pnpm-debug.log*
 # Merge Workspace
 # ===========================
 merge-workspace/
+
+# ===========================
+# Local Development Tools
+# ===========================
+bitcoin_scanner.py
+bitcoin_scanner/
+docker-btc-regtest-stack/
+esplora_data/
