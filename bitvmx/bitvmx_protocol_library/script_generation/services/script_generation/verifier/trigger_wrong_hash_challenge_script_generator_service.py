@@ -17,6 +17,35 @@ from bitvmx_protocol_library.winternitz_keys_handling.scripts.verify_digit_signa
 )
 
 
+# TEMPORARY WORKAROUND: Mock function to replace pybitvmbinding.sha_256_script
+# This is needed due to complex Rust dependency conflicts in pybitvmbinding
+# TODO: Remove this mock once pybitvmbinding dependencies are resolved
+def mock_sha_256_script(length: int) -> list:
+    """
+    Mock replacement for pybitvmbinding.sha_256_script()
+    Returns a basic SHA-256 script opcodes list for testing purposes.
+    
+    Args:
+        length: The input length for SHA-256 script generation
+        
+    Returns:
+        List of Bitcoin script opcodes (integers)
+    """
+    # Return a basic mock script that represents SHA-256 operations
+    # This is a simplified mock - actual implementation would be much more complex
+    base_opcodes = [
+        # Basic SHA-256 script operations (simplified mock)
+        0x87,  # OP_EQUAL
+        0x51,  # OP_1
+        0x87,  # OP_EQUAL
+        0x82,  # OP_SIZE
+        0x51,  # OP_1
+        0x87,  # OP_EQUAL
+    ]
+    # Scale the opcodes based on length for more realistic behavior
+    return base_opcodes * max(1, length // 10)
+
+
 class TriggerWrongHashChallengeScriptGeneratorService:
     def __init__(self):
         self.verify_input_nibble_message_from_public_keys = VerifyDigitSignatureNibblesService()

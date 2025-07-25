@@ -1,13 +1,42 @@
 import secrets
 
+import pybitvmbinding
 from bitcoinutils.keys import PrivateKey
 from fastapi import HTTPException
 
 from bitvmx_protocol_library.enums import BitcoinNetwork
+from bitvmx_protocol_library.script_generation.entities.business_objects.bitcoin_script import (
+    BitcoinScript,
+)
 from prover_app.api.v1.setup.fund.v1.view_models.post import (
     SetupFundPostV1Input,
     SetupFundPostV1Output,
 )
+
+
+# TEMPORARY WORKAROUND: Mock function to replace pybitvmbinding.sha_256_script
+# This is needed due to complex Rust dependency conflicts in pybitvmbinding
+# TODO: Remove this mock once pybitvmbinding dependencies are resolved
+def mock_sha_256_script(length: int) -> list:
+    """
+    Mock replacement for pybitvmbinding.sha_256_script()
+    Returns a basic SHA-256 script opcodes list for testing purposes.
+    
+    Args:
+        length: The input length for SHA-256 script generation
+        
+    Returns:
+        List of Bitcoin script opcodes (integers)
+    """
+    # Return a basic mock script that represents SHA-256 operations
+    # This is a simplified mock - actual implementation would be much more complex
+    mock_opcodes = [
+        # OP_SHA256 equivalent operations (simplified)
+        0x87,  # OP_EQUAL
+        0x51,  # OP_1  
+        0x87,  # OP_EQUAL
+    ]
+    return mock_opcodes
 
 
 class SetupFundPostViewControllerV1:
@@ -22,7 +51,7 @@ class SetupFundPostViewControllerV1:
         self.common_protocol_properties = common_protocol_properties
 
     async def __call__(self, setup_post_view_input: SetupFundPostV1Input) -> SetupFundPostV1Output:
-        # sha_256_bitcoin_script = BitcoinScript.from_int_list(script_list=pybitvmbinding.sha_256_script(int(64 / 2)))
+        sha_256_bitcoin_script = BitcoinScript.from_int_list(script_list=pybitvmbinding.sha_256_script(int(64 / 2)))
         if (
             not self.common_protocol_properties.network == BitcoinNetwork.MUTINYNET
             and not self.common_protocol_properties.network == BitcoinNetwork.REGTEST

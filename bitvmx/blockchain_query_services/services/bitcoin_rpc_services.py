@@ -18,7 +18,7 @@ from blockchain_query_services.entities.transaction_info_service.transaction_out
 
 
 class BitcoinRPCClient:
-    def __init__(self, rpc_user, rpc_password, rpc_host="host.docker.internal", rpc_port=8443):
+    def __init__(self, rpc_user, rpc_password, rpc_host="bitcoin-regtest", rpc_port=18443):
         """
         Initialize Bitcoin RPC client for regtest
 
@@ -33,11 +33,13 @@ class BitcoinRPCClient:
         try:
             self._call_rpc("getwalletinfo", [])
         except Exception as e1:
-            if "No wallet is loaded" in e1.args[0]:
+            error_message = str(e1)
+            if "No wallet is loaded" in error_message:
                 try:
                     self._call_rpc("createwallet", ["testwallet"])
                 except Exception as e2:
-                    if "Database already exists" in e2.args[0]:
+                    error_message2 = str(e2)
+                    if "Database already exists" in error_message2:
                         self._call_rpc("loadwallet", ["testwallet"])
                     else:
                         raise e2
@@ -164,8 +166,8 @@ class BitcoinRPCClients(containers.DeclarativeContainer):
 
     regtest = providers.Factory(
         BitcoinRPCClient,
-        rpc_user="myuser",
-        rpc_password="SomeDecentp4ssw0rd",
-        rpc_host="host.docker.internal",
-        rpc_port=8443,
+        rpc_user="bitcoinrpc",
+        rpc_password="test123",
+        rpc_host="bitcoin-regtest",
+        rpc_port=18443,
     )

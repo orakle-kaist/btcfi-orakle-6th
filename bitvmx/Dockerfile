@@ -12,7 +12,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 RUN pip install --upgrade pip
 
-COPY requirements/base.txt /tmp/requirements/
+COPY bitvmx/requirements/base.txt /tmp/requirements/
 
 RUN pip install -r /tmp/requirements/base.txt
 
@@ -23,14 +23,17 @@ RUN pip install -r /tmp/requirements/base.txt
 RUN pip install --no-cache-dir git+https://github.com/ramonamela/python-bitcoin-utils.git@3e8c2a0bf1b080ed5f80f4e78f71005f42eb52c5
 #RUN pip install --no-cache-dir git+https://github.com/ramonamela/python-bitcoin-utils.git@5b213cb10a6fe810fb9c0606608bfbc05789cd3a
 
-RUN pip install --no-cache-dir git+https://github.com/ramonamela/pybitvmbinding.git@32e970dc3d4321453dae949c36308f816352ffa3
+COPY bitvmx_protocol/pybitvmbinding /tmp/pybitvmbinding
+RUN cd /tmp/pybitvmbinding && \
+    pip install --no-cache-dir . && \
+    rm -rf /tmp/pybitvmbinding
 
 RUN mkdir /bitvmx-backend
 
 WORKDIR /bitvmx-backend
 
-COPY ./BitVMX-CPU ./BitVMX-CPU
-COPY ./blockchain_query_services ./blockchain_query_services
+COPY bitvmx/BitVMX-CPU ./BitVMX-CPU
+COPY bitvmx/blockchain_query_services ./blockchain_query_services
 
 WORKDIR /bitvmx-backend/BitVMX-CPU
 
@@ -42,11 +45,11 @@ FROM bitvmx-base as prover-backend
 
 RUN pip install --upgrade pip
 
-COPY requirements/prover.txt /tmp/requirements/
+COPY bitvmx/requirements/prover.txt /tmp/requirements/
 
 RUN pip install -r /tmp/requirements/prover.txt
 
-COPY ./prover_app ./prover_app
+COPY bitvmx/prover_app ./prover_app
 RUN mkdir prover_files
 
 CMD ["uvicorn", "prover_app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "debug", "--lifespan", "on"]
@@ -55,11 +58,11 @@ FROM bitvmx-base as verifier-backend
 
 RUN pip install --upgrade pip
 
-COPY requirements/verifier.txt /tmp/requirements/
+COPY bitvmx/requirements/verifier.txt /tmp/requirements/
 
 RUN pip install -r /tmp/requirements/verifier.txt
 
-COPY ./verifier_app ./verifier_app
+COPY bitvmx/verifier_app ./verifier_app
 RUN mkdir verifier_files
 
 CMD ["uvicorn", "verifier_app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "debug", "--lifespan", "on"]

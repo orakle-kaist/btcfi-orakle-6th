@@ -60,7 +60,13 @@ class CreateSetupWithFundingController:
         signature_private_key = PrivateKey(b=secrets.token_bytes(32))
         # This is not architecturally correct, we should call the setup controller (as it was before)
         # Nevertheless, it's done like this to ensure we check the whole flow while developing so don't change it
-        url = f"{self.protocol_properties.prover_host}/setup"
+        
+        # Handle URLs that already contain protocol scheme
+        prover_host = self.protocol_properties.prover_host
+        if prover_host.startswith(('http://', 'https://')):
+            url = f"{prover_host}/setup"
+        else:
+            url = f"http://{prover_host}/setup"
         headers = {"accept": "application/json", "Content-Type": "application/json"}
         setup_post_v1_input = SetupPostV1Input(
             max_amount_of_steps=max_amount_of_steps,

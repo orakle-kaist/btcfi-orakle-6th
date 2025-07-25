@@ -1,0 +1,42 @@
+{
+  "timestamp": 1753438902,
+  "bitvmx_version": "2024.09.03",
+  "execution_type": "btcfi_option_registration",
+  "input": {
+    "size_bytes": 160,
+    "sha256": "a4dbc3697f9005bcfd7c536599ed79fb068c955f2aa0fb570b143b96dfac3592"
+  },
+  "execution": {
+    "total_steps": 691,
+    "architecture": "RISC-V 32-bit",
+    "memory_model": "BitVMX standard",
+    "input_address": "0x80000000",
+    "output_address": "0x80001000"
+  },
+  "hash_chain": {
+    "length": 691,
+    "first_5": [
+      "99fa480cf7ba61a4585325f8119ccfba66df5745e59768684ce17f630ee91c8b",
+      "c76fd6d94b1e8d65966fc8b6709999839d2f3956a32ff121b62a1e1f5e391366",
+      "c4ea493c342cb3275e17efa31d352bcf5dfff8eeedd19f447249c2cf0378f484",
+      "d46ab464f58e06b125ebabbf743b0cfef11f301045c4b6fcc292cf1ceb31a28e",
+      "19c876641d62663a8eeefeaf6b91061981374f2cf004a6c8c030a7f1a2e80564"
+    ],
+    "last_5": [
+      "143d3dbd6a903906e04a316eb7075ef1abee5c7a58d6a612b33003f9e68c3517",
+      "d7e87797c4f5cbe3d536a55746de04b23813b8432315dffcef474b23232b72cf",
+      "a410a0988988be3a4db41600de3b48f2043a8338c01f014d937c4a68fafb3534",
+      "ae793ac166db4c465a246ad7d97afac27e8aca5e4ffb6dead2f3ef4792828fcf",
+      "ae793ac166db4c465a246ad7d97afac27e8aca5e4ffb6dead2f3ef4792828fcf"
+    ],
+    "final_bitvmx_hash": "923f82cc1a6a7fc4c02e15486455775ad5d8e0532fd560d85b7aa0fba7be9bbe"
+  },
+  "validation": {
+    "option_type": 0,
+    "strike_price_usd": 500.0,
+    "quantity_btc": 0.001,
+    "premium_btc": 5e-05,
+    "oracle_count": 3,
+    "validation_passed": true
+  }
+}
