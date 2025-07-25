@@ -124,3 +124,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# ===========================
+# Merge Workspace
+# ===========================
+merge-workspace/

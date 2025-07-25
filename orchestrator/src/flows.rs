@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use anyhow::Result;
-use crate::connectors::{OracleConnector, CalculationConnector, ContractConnector, BitVMXConnector};
+use crate::connectors_real::{OracleConnector, CalculationConnector, ContractConnector, BitVMXConnector};
 use crate::events::{EventBus, Event};
 
 /// Update 사이클 플로우: Oracle → Calculation → Frontend

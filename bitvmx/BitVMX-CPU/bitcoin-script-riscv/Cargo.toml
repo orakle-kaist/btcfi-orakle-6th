@@ -1,0 +1,13 @@
+[package]
+name = "bitcoin-script-riscv"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitcoin-script-stack = { git = "https://github.com/FairgateLabs/rust-bitcoin-script-stack", features = ["interactive"], branch = "bitvmx"}
+bitcoin = "0.32.1"
+bitcoin-script = { git = "https://github.com/FairgateLabs/rust-bitcoin-script", branch="bitvmx" }
+riscv-decode = "0.2.1"
+thiserror = "1.0.61"

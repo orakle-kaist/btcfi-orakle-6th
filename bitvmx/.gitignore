@@ -1,0 +1,90 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environments
+.env*
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+htmlcov/
+.tox/
+.nox/
+
+# Logs
+*.log
+
+# Docker volumes
+prover_files/
+verifier_files/
+*files/
+
+# Execution outputs
+execution_files/*.txt
+execution_files/*.json
+option_execution_output.txt
+option_settlement_proof.script
+
+# Development files
+*.bak
+*.tmp
+*.temp
+checkpoint.*.json
+*_mock.*
+*_test_data.*
+
+# Documentation build
+docs/_build/
+/site/
