@@ -1,0 +1,4 @@
+[submodule "bitvmx_protocol"]
+	path = bitvmx_protocol
+	url = https://github.com/97woo/OracleVM
+	branch = proof
