@@ -3,6 +3,7 @@
 use crate::{OracleVmError, Result};
 use bitcoin::secp256k1::{ecdsa::Signature, Message, PublicKey, Secp256k1, SecretKey};
 use sha2::{Digest, Sha256};
+use rand::RngCore;
 
 /// Sign data with a private key
 pub fn sign_data(data: &[u8], secret_key: &SecretKey) -> Result<Signature> {
@@ -34,7 +35,12 @@ pub fn verify_signature(
 /// Generate key pair
 pub fn generate_keypair() -> (SecretKey, PublicKey) {
     let secp = Secp256k1::new();
-    secp.generate_keypair(&mut rand::thread_rng())
+    let mut rng = rand::thread_rng();
+    let mut secret_bytes = [0u8; 32];
+    rng.fill_bytes(&mut secret_bytes);
+    let secret_key = SecretKey::from_slice(&secret_bytes).expect("32 bytes, within curve order");
+    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+    (secret_key, public_key)
 }
 
 /// Hash data with SHA256

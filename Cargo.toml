@@ -1,16 +1,15 @@
 [workspace]
 members = [
     "crates/oracle-node",
-    "crates/aggregator",
+    "crates/aggregator", 
     "crates/committer",
     "crates/bitcoin-client",
     "crates/common",
     "contracts",
     "calculation",
     "orchestrator",
-    "bitvmx_protocol/BitVMX-CPU/bitcoin-script-riscv",
-    "bitvmx_protocol/BitVMX-CPU/emulator",
-    "bitvmx_protocol/option_settlement",
+    "bitvmx_protocol/bitvmx/BitVMX-CPU/bitcoin-script-riscv",
+    "bitvmx_protocol/bitvmx/BitVMX-CPU/emulator",
 ]
 resolver = "2"
 

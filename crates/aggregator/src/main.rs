@@ -56,9 +56,9 @@ impl AggregatorService {
             std::collections::HashMap::new();
 
         for data in price_data.iter() {
-            // 최근 2분 내 데이터만 사용 (더 넉넉한 윈도우)
+            // 최근 120초 내 데이터만 사용 (1분 주기에 맞춘 윈도우)
             if now - data.received_at <= 120 {
-                // 2분 = 120초
+                // 120초
                 latest_per_exchange
                     .entry(data.source.clone()) // source = exchange name
                     .and_modify(|(existing_price, existing_time)| {
@@ -109,7 +109,7 @@ impl AggregatorService {
         let max_timestamp = *timestamps.iter().max().unwrap();
 
         if max_timestamp - min_timestamp > 60 {
-            // 1분 초과 차이
+            // 60초 초과 차이 (1분 수집 주기 고려)
             warn!(
                 "⚠️ Timestamp mismatch: {} second difference. Min: {}, Max: {}",
                 max_timestamp - min_timestamp,
