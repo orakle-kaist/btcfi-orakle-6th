@@ -31,7 +31,7 @@ build/
 *.so
 *.dylib
 *.dll
-*.elf
+# *.elf  # Keep .elf files for BitVMX execution
 *.bin
 *.exe
 *.out

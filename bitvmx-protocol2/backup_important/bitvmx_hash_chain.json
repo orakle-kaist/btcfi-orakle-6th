@@ -1,0 +1,38 @@
+{
+  "execution_summary": {
+    "total_steps": 3597,
+    "chain_length": 3597,
+    "final_hash": "0ab972de50be049f48aedb3c659ad683ea027acb13b3720efd6baae505dcd75b",
+    "merkle_root": "004d8460c91d1a33fc3757b503d022f3fa0324ec738227389cf1cced9237babf"
+  },
+  "bitvmx_commitment": {
+    "version": "1.0",
+    "timestamp": 1753457195,
+    "program_hash": "40455faab6f71dc4aee421d719aa08ccce82816ea4c798eb8cf991b80fd59fd1",
+    "input_hash": "692f508b1de24dd1b0d678b6b6f737101932fafa45039ba00b6f524e227c6ebe",
+    "execution_steps": 3597,
+    "final_hash": "0ab972de50be049f48aedb3c659ad683ea027acb13b3720efd6baae505dcd75b",
+    "merkle_root": "004d8460c91d1a33fc3757b503d022f3fa0324ec738227389cf1cced9237babf",
+    "checkpoints": [
+      "2ef9907fcf514712ef0fdd8720f4bd7f97fdd5cf723e6f7cc686004472a36c6c",
+      "15533c6114007c5a3e6e874c9bcbe85b26a5bd2d2d35a528ce4462f4785c499e",
+      "bd90e801770842d50714f5ea591dbccd837bc9b21dd95c51541d3bb38e2b4872",
+      "52d1a4507c6a5635f67c09183316312ddeb34dac0eb743722bed2a50d880eb15"
+    ],
+    "chain_length": 3597,
+    "commitment_hash": "479092c3ddd559200bdc3274746c2433352027d10937850827fbb9c388e82ffc"
+  },
+  "sample_hashes": [
+    "2ef9907fcf514712ef0fdd8720f4bd7f97fdd5cf723e6f7cc686004472a36c6c",
+    "f059688164dd6edf3a46f7e3b1c8dac8e04032b2897a61491a78a089d9dc59c1",
+    "bc2031eadc6d95cf090a2cb5408ae42b77ad4c4a2ef03c9655a4e558959901d5",
+    "49304ab7322504e663a48030a898cf98d579f5bec2f3677a0b6704af7ef15ce8",
+    "e6aff16aad1c1970a618eb0dc1accb3d125bd60e38b2590fd8c24e6370965452",
+    "...",
+    "4652138f09e8449fd8bc26321b48671670db56db1e73d4f4772fec9a0772ab3c",
+    "fcdbfd5cf7fe83663a80e0c2335bf3d4074577b4f2626fe35273ac7380af3d38",
+    "02e2c6264227e9ed3bd189ba76bf967d3b9912b08fe85198ac578b21c5b8ebc1",
+    "81b5d9fea186922715951d8fadd7834e0fd3ae3b8e27baabb58615555ca4ea87",
+    "0ab972de50be049f48aedb3c659ad683ea027acb13b3720efd6baae505dcd75b"
+  ]
+}
