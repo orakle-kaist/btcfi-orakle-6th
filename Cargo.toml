@@ -8,8 +8,6 @@ members = [
     "contracts",
     "calculation",
     "orchestrator",
-    "bitvmx_protocol/bitvmx/BitVMX-CPU/bitcoin-script-riscv",
-    "bitvmx_protocol/bitvmx/BitVMX-CPU/emulator",
 ]
 resolver = "2"
 
