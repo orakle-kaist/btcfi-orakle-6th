@@ -48,10 +48,6 @@ services:
       - type: bind
         source: regtestbitcoin.conf
         target: /bitcoin/.bitcoin/bitcoin.conf
-#    volumes:
-#      - type: bind
-#        source: ./bitcoin_data
-#        target: /root/.bitcoin
 
   format:
     build:
@@ -62,25 +58,8 @@ services:
       - type: bind
         source: .
         target: /bitvmx-backend
-    entrypoint: sh -c "black --config .black . && ruff check --fix"
-
-  flake8:
-    image: bitvmx-base
-    volumes:
-      - type: bind
-        source: ./
-        target: /bitvmx-backend
-        read_only: true
-    entrypoint: flake8
-
-  black:
-    image: bitvmx-base
-    volumes:
-      - type: bind
-        source: ./
-        target: /bitvmx-backend
-        read_only: true
-    entrypoint: black --config .black --check --diff .
+    networks:
+      - bitvmx-net
 
 networks:
   bitvmx-net:

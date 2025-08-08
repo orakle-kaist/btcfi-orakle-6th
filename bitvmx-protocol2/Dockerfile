@@ -38,6 +38,8 @@ RUN cargo build
 
 WORKDIR /bitvmx-backend
 
+COPY ./bitvmx_protocol_library ./bitvmx_protocol_library
+
 FROM bitvmx-base as prover-backend
 
 RUN pip install --upgrade pip
@@ -47,6 +49,7 @@ COPY requirements/prover.txt /tmp/requirements/
 RUN pip install -r /tmp/requirements/prover.txt
 
 COPY ./prover_app ./prover_app
+COPY ./bitvmx_protocol_library ./bitvmx_protocol_library
 RUN mkdir prover_files
 
 CMD ["uvicorn", "prover_app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "debug", "--lifespan", "on"]
@@ -60,6 +63,7 @@ COPY requirements/verifier.txt /tmp/requirements/
 RUN pip install -r /tmp/requirements/verifier.txt
 
 COPY ./verifier_app ./verifier_app
+COPY ./bitvmx_protocol_library ./bitvmx_protocol_library
 RUN mkdir verifier_files
 
 CMD ["uvicorn", "verifier_app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "debug", "--lifespan", "on"]

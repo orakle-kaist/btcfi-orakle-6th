@@ -36,17 +36,15 @@ cp .env.example .env
 - `PRIVATE_KEY`: 본인의 프라이빗 키 (테스트넷용!)
 - `ADDRESS`: 프라이빗 키에 대응하는 주소
 
-### 3. Docker 환경 실행 (선택사항)
+### 3. Docker 환경 실행 (현재 미지원)
 
 ```bash
-# 이미지 빌드
-docker-compose build
-
-# 서비스 실행
-docker-compose up -d
+# 주의: 현재 Docker 설정은 준비 중입니다
+# Prover/Verifier 컨테이너는 별도 설정이 필요합니다
+# 단순 트랜잭션 테스트는 Docker 없이 가능합니다
 ```
 
-### 4. 로컬 환경 설정 (Docker 없이)
+### 4. 로컬 환경 설정 (권장 - Docker 없이)
 
 ```bash
 # 가상환경 생성
@@ -165,6 +163,11 @@ python3 domain/option/create_real_tx.py
 - UTXO가 이미 사용되었는지 확인
 - 주소가 올바른지 확인
 - Explorer에서 잔액 확인
+
+### Prover/Verifier 관련 문제
+- **현재 단순 모드로 실행 가능**: Prover/Verifier 없이도 트랜잭션 생성 및 브로드캐스트 가능
+- **Docker 컨테이너 미포함**: 현재 버전은 BitVMX 컨테이너 없이 동작
+- **향후 업데이트 예정**: 전체 BitVMX 프로토콜 스택은 추후 통합 예정
 
 ## 📚 참고 자료
 
