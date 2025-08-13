@@ -5,6 +5,7 @@ services:
       target: prover-backend
     image: prover-backend
     env_file:
+     - .env_common
      - .env_prover
     volumes:
       - type: bind
@@ -23,6 +24,7 @@ services:
       target: verifier-backend
     image: verifier-backend
     env_file:
+     - .env_common
      - .env_verifier
     volumes:
       - type: bind

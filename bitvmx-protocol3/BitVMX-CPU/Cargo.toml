@@ -1,4 +1,0 @@
-[workspace]
-resolver = "1"
-
-members = [ "bitcoin-script-riscv", "emulator"]

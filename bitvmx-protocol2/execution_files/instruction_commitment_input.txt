@@ -1,3 +1,5 @@
+.input Start: 0x00010000
+.input End: 0x00010100
 PC: 0x80000000 Micro: 0 Opcode: 0xfd010113 Key: addi
 PC: 0x80000004 Micro: 0 Opcode: 0x02812623 Key: sw_0
 PC: 0x80000004 Micro: 1 Opcode: 0x02812623 Key: sw_1
