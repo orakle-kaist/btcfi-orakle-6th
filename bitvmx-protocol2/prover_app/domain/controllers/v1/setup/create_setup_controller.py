@@ -91,7 +91,16 @@ class CreateSetupController:
         init_time = time()
 
         funding_tx = self.transaction_info_service(tx_id=funding_tx_id)
-        initial_amount_of_satoshis = funding_tx.outputs[funding_index].value - step_fees_satoshis
+        target_output = None
+        for output in funding_tx.outputs:
+            if output.index == funding_index:
+                target_output = output
+                break
+        
+        if target_output is None:
+            raise Exception(f"Output with index {funding_index} not found in transaction {funding_tx_id}")
+        
+        initial_amount_of_satoshis = target_output.value - step_fees_satoshis
         bitvmx_protocol_properties_dto = BitVMXProtocolPropertiesDTO(
             max_amount_of_steps=max_amount_of_steps,
             amount_of_input_words=amount_of_input_words,
@@ -186,7 +195,7 @@ class CreateSetupController:
 
             public_keys_response = requests.post(url, headers=headers, json=data)
             if public_keys_response.status_code != 200:
-                raise Exception("Some error with the public keys verifier call")
+                raise Exception(f"Verifier call failed: {public_keys_response.status_code}")
             public_keys_response_json = public_keys_response.json()
 
             verifier_public_keys_dict[verifier_uuid] = public_keys_response_json[

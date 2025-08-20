@@ -1,7 +1,6 @@
 [workspace]
 members = [
     ".",
-    "contracts",
     "BitVMX-CPU/bitcoin-script-riscv",
     "BitVMX-CPU/emulator",
 ]
@@ -24,7 +23,7 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4"] }
 
 # Local dependencies
-btcfi-contracts = { path = "contracts" }
+# btcfi-contracts = { path = "contracts" }
 
 [dev-dependencies]
 tokio = { version = "1.35", features = ["full"] }

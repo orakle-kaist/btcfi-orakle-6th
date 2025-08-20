@@ -42,7 +42,8 @@ class CreateSetupController:
         )
 
         if network == BitcoinNetwork.MUTINYNET:
-            verifier_destination_address = "tb1qd28npep0s8frcm3y7dxqajkcy2m40eysplyr9v"
+            import os
+            verifier_destination_address = os.getenv("VERIFIER_DESTINATION_ADDRESS", "tb1q8fg5jrspc7fn8jvpe5tfr7e5dlwvsh6xw8cq4j")
         else:
             verifier_destination_address = (
                 signature_private_key.get_public_key().get_segwit_address().to_string()

@@ -184,12 +184,23 @@ class BitVMXWrapper:
     ):
         directory = self.base_path + setup_uuid
         pattern = re.compile(r"^checkpoint\.\d+\.json$")
+        
+        print(f"[DEBUG] generate_execution_checkpoints called")
+        print(f"[DEBUG] Directory: {directory}")
+        print(f"[DEBUG] ELF file: {elf_file}")
+        print(f"[DEBUG] Input hex: {input_hex}")
 
         # List all files in the specified directory
-        files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+        try:
+            files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+        except FileNotFoundError:
+            print(f"[DEBUG] Directory {directory} does not exist, creating it")
+            os.makedirs(directory, exist_ok=True)
+            files = []
 
         # Filter files that match the pattern
         checkpoint_files = [f for f in files if pattern.match(f)]
+        print(f"[DEBUG] Found {len(checkpoint_files)} checkpoint files")
         if len(checkpoint_files) == 0:
             command = [
                 "cargo",
@@ -247,6 +258,9 @@ class BitVMXWrapper:
                     command.append("0" + str(base_last_step - 1))
 
             execution_directory = self.base_path + setup_uuid
+            
+            print(f"[DEBUG] Execution directory: {execution_directory}")
+            print(f"[DEBUG] Command: {' '.join(command)}")
 
             try:
                 # Run the command in the specified directory
@@ -256,8 +270,10 @@ class BitVMXWrapper:
 
             except subprocess.CalledProcessError as e:
                 # Handle errors in execution
-                print("An error occurred while running the command.")
-                print("Return code:", e.returncode)
-                print("Output:\n", e.stdout)
-                print("Errors:\n", e.stderr)
+                print("[ERROR] Command execution failed")
+                print(f"[ERROR] Return code: {e.returncode}")
+                print(f"[ERROR] Working directory: {execution_directory}")
+                print(f"[ERROR] Command: {' '.join(command)}")
+                print(f"[ERROR] Output:\n{e.stdout}")
+                print(f"[ERROR] Errors:\n{e.stderr}")
                 raise Exception("Some problem with the computation")

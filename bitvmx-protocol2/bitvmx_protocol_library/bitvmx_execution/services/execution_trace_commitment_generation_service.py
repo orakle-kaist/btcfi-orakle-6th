@@ -18,6 +18,7 @@ class ExecutionTraceCommitmentGenerationService:
         mapping_dict = {}
         pattern = r'Key:\s*(\w+),\s*Script:\s*"([^"]+)"'
         for line in mapping_lines:
+            # Skip lines that don't match the pattern (like Entrypoint line)
             match = re.search(pattern, line)
             if match:
                 mapping_dict[match.group(1)] = match.group(2)
@@ -36,15 +37,14 @@ class ExecutionTraceCommitmentGenerationService:
         )
         for line in commitment_lines:
             match = re.search(pattern, line)
-            if match:
-                pc = match.group(1)[2:]
-                micro = match.group(2).zfill(2)
-                # This is not really necessary (we can add the verification)
-                # opcode = match.group(3)
-                key = match.group(4)
-                composed_key = pc + micro
-                key_list.append(composed_key)
-                instruction_dict[composed_key] = mapping_dict[key]
-                opcode_dict[composed_key] = match.group(3)[2:]
+            pc = match.group(1)[2:]
+            micro = match.group(2).zfill(2)
+            # This is not really necessary (we can add the verification)
+            # opcode = match.group(3)
+            key = match.group(4)
+            composed_key = pc + micro
+            key_list.append(composed_key)
+            instruction_dict[composed_key] = mapping_dict[key]
+            opcode_dict[composed_key] = match.group(3)[2:]
         # Just in case, but this should not be necessary since it's ordered in origin
         return key_list, instruction_dict, opcode_dict

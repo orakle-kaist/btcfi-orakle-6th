@@ -95,6 +95,15 @@ class GeneratePublicKeysController:
             destroyed_public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
         )
         print("Call transactions time: " + str(time() - init_time))
+        
+        # Set verifier destination address for Mutinynet
+        if self.common_protocol_properties.network == BitcoinNetwork.MUTINYNET:
+            import os
+            bitvmx_protocol_setup_properties_dto.verifier_destination_address = os.getenv(
+                "VERIFIER_DESTINATION_ADDRESS", 
+                "tb1q8fg5jrspc7fn8jvpe5tfr7e5dlwvsh6xw8cq4j"
+            )
+        
         bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto = (
             self.transaction_generator_from_public_keys_service(
                 bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,

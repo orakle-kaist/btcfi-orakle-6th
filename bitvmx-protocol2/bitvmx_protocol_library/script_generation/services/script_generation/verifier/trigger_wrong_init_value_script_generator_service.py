@@ -127,12 +127,11 @@ class GenericTriggerWrongInitValueScriptGeneratorService:
 
         script.append("OP_ELSE")
 
-        init_padded = init.zfill(8)  # Pad with zeros to ensure 8 digits
-        script.extend([1, "OP_ROLL", int(init_padded[2:5], 16), "OP_EQUAL"])
+        script.extend([1, "OP_ROLL", int(init[2:5], 16), "OP_EQUAL"])
 
         script.append("OP_IF")
 
-        script.extend([int(init_padded[5:8], 16), "OP_GREATERTHANOREQUAL"])
+        script.extend([int(init[5:8], 16), "OP_GREATERTHANOREQUAL"])
 
         script.append("OP_ELSE")
 
@@ -171,12 +170,12 @@ class GenericTriggerWrongInitValueScriptGeneratorService:
 
         script.append("OP_ELSE")
 
-        end_padded = end.zfill(8)  # Pad with zeros to ensure 8 digits
-        script.extend([1, "OP_ROLL", int(end_padded[2:5], 16), "OP_EQUAL"])
+        script.extend([1, "OP_ROLL", int(end[2:5], 16), "OP_EQUAL"])
 
         script.append("OP_IF")
 
-        script.extend([int(end_padded[5:8], 16), "OP_LESSTHANOREQUAL"])
+        end_value = end[5:8] if len(end) > 5 else "000"
+        script.extend([int(end_value, 16) if end_value else 0, "OP_LESSTHANOREQUAL"])
 
         script.append("OP_ELSE")
 

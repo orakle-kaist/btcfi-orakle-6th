@@ -157,9 +157,8 @@ class PublishHashTransactionService:
             )
         )
 
-        broadcast_transaction_service(
-            transaction=bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.hash_result_tx.serialize()
-        )
+        tx_hex = bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.hash_result_tx.serialize()
+        broadcast_transaction_service(transaction=tx_hex)
         print(
             "Hash result revelation transaction: "
             + bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.hash_result_tx.get_txid()

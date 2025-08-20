@@ -12,6 +12,7 @@ class PublicKeysPostViewControllerV1:
     async def __call__(
         self, public_keys_post_view_input: PublicKeysPostV1Input
     ) -> PublicKeysPostV1Output:
+        print(f"[VERIFIER VIEW] Received DTO with prover_destination_address: '{public_keys_post_view_input.bitvmx_protocol_setup_properties_dto.prover_destination_address}'", flush=True)
         (
             bitvmx_verifier_winternitz_public_keys_dto,
             verifier_public_key_hex,
