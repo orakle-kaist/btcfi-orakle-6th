@@ -85,6 +85,11 @@ class CreateSetupController:
         prover_destination_address: str,
         prover_signature_private_key: str,
         prover_signature_public_key: str,
+        # 옵션 관련 파라미터 (선택적)
+        option_type: str = None,
+        strike_price: float = None,
+        expiry_timestamp: int = None,
+        premium_sats: int = None,
     ) -> str:
         setup_uuid = str(uuid.uuid4())
         prover_uuid = str(uuid.uuid4())

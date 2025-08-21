@@ -10,7 +10,7 @@ import time
 import sys
 
 # API 엔드포인트
-PROVER_URL = "http://localhost:8081"  # Prover 포트 8081로 수정
+PROVER_URL = "http://localhost:8001"  # Prover 포트 8001
 VERIFIER_URL = "http://localhost:8080"
 
 def create_setup():
