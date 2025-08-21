@@ -2,42 +2,23 @@
 옵션 관련 API 라우터
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Annotated
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
 
-from prover_app.domain.controllers.v1.option.option_controller import OptionController
+from prover_app.api.v1.option.crud.v1.view_models import (
+    OptionRegisterInput,
+    OptionPurchaseInput
+)
+from prover_app.dependency_injection.api.v1.option import (
+    OptionRegisterViewControllers,
+    OptionPurchaseViewControllers
+)
 from prover_app.domain.controllers.v1.option.option_integration import (
-    BitVMXOptionIntegration,
-    prepare_option_setup,
-    prepare_option_input,
-    process_option_settlement
+    BitVMXOptionIntegration
 )
 
 router = APIRouter(prefix="/option", tags=["Option"])
-
-# 옵션 컨트롤러 인스턴스
-option_controller = OptionController()
-# BitVMX 통합 모듈
-option_integration = BitVMXOptionIntegration()
-
-
-class OptionProductRegistrationRequest(BaseModel):
-    """옵션 상품 등록 요청"""
-    option_type: str  # "CALL" or "PUT"
-    strike_price: float  # USD
-    expiry_timestamp: int  # Unix timestamp
-    max_quantity: float
-    premium_rate: float  # 0.01 = 1%
-
-
-class OptionPurchaseRequest(BaseModel):
-    """옵션 구매 요청"""
-    product_id: str
-    quantity: float
-    buyer_address: str
-    payment_txid: str
-    setup_uuid: str
 
 
 class OptionSettlementRequest(BaseModel):
@@ -54,68 +35,140 @@ class OptionInputRequest(BaseModel):
     quantity: float
 
 
-@router.post("/product/register")
+@router.post("/register")
 async def register_option_product(
-    request: OptionProductRegistrationRequest = Body()
-) -> Dict[str, Any]:
+    option_type: str = "CALL",
+    strike_price: float = 50000,
+    expiry_days: int = 7,
+    funding_amount_btc: float = 0.01
+):
     """
-    옵션 상품 등록 (운영자)
+    옵션 상품 등록 - BitVMX Setup 활용
     
-    새로운 옵션 상품을 등록합니다.
+    기존 BitVMX Setup 프로세스를 사용하여 옵션 풀 자금을 Lock합니다.
     """
-    try:
-        result = await option_controller.register_option_product(
-            option_type=request.option_type,
-            strike_price=request.strike_price,
-            expiry_timestamp=request.expiry_timestamp,
-            max_quantity=request.max_quantity,
-            premium_rate=request.premium_rate
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    from prover_app.api.v1.setup.crud.v1.view_models.post import SetupPostV1Input
+    from prover_app.dependency_injection.api.v1.setup import SetupPostViewControllers
+    
+    # BitVMX Setup 입력 생성
+    setup_input = SetupPostV1Input(
+        max_amount_of_steps=100,  # Pre-sign은 간단하므로 적게
+        amount_of_bits_wrong_step_search=2,
+        funding_tx_id="dummy_funding_tx",  # 실제로는 UTXO 조회 필요
+        funding_index=0,
+        funding_amount_of_satoshis=int(funding_amount_btc * 100_000_000),
+        secret_origin_of_funds="cVdte9ei2xsVjB8YvySNSkHpEQJ5VHhTjq5BvkBytbgNrWNgz4Xq",
+        verifier_list=[],  # Pre-sign이므로 Verifier 불필요
+        prover_destination_address="tb1qt8rdur557nz338g3lekc6458pj0dl63c0s9904",
+        prover_signature_private_key="d8a1e1224e63135765bde9dc8a2c8e403eee8be73d3589d58c5ddbf9dce3fdf4",
+        prover_signature_public_key="03bf751f0d2d22e6f0163c9acaa14ae04e6e1a004cb4a24d893c1f86314e79d5de",
+        amount_of_input_words=4  # 옵션 파라미터용
+    )
+    
+    # 기존 Setup 컨트롤러 사용
+    view_controller = SetupPostViewControllers.v1()
+    setup_result = await view_controller(setup_post_view_input=setup_input)
+    
+    # 옵션 메타데이터 추가
+    return {
+        "setup_uuid": setup_result.get("setup_uuid"),
+        "option_type": option_type,
+        "strike_price": strike_price,
+        "expiry_days": expiry_days,
+        "pool_size_btc": funding_amount_btc,
+        "message": "Option product registered using BitVMX Setup"
+    }
 
 
 @router.post("/purchase")
 async def purchase_option(
-    request: OptionPurchaseRequest = Body()
-) -> Dict[str, Any]:
+    setup_uuid: str,
+    buyer_address: str,
+    option_type: str = "CALL",
+    strike_price: float = 50000
+):
     """
-    옵션 구매 (사용자)
+    옵션 구매 - BitVMX Native Pre-sign 활용
     
-    프리미엄을 지불하고 옵션을 구매합니다.
-    BitVMX pre-sign을 받아 만기 시 자동 정산이 보장됩니다.
+    프리미엄을 지불하고 Pre-sign 트랜잭션을 받습니다.
+    기존 bitvmx_native_presign_service를 사용합니다.
     """
-    try:
-        result = await option_controller.purchase_option(
-            product_id=request.product_id,
-            quantity=request.quantity,
-            buyer_address=request.buyer_address,
-            payment_txid=request.payment_txid,
-            setup_uuid=request.setup_uuid
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    from datetime import datetime, timedelta
+    from prover_app.dependency_injection.persistences.bitvmx_protocol_setup_properties_dto_persistences import (
+        BitVMXProtocolSetupPropertiesDtoPersistences
+    )
+    
+    # Setup 정보 조회
+    setup_persistence = BitVMXProtocolSetupPropertiesDtoPersistences.v1()
+    setup_dto = await setup_persistence.load(setup_uuid)
+    
+    if not setup_dto:
+        raise HTTPException(status_code=404, detail="Setup not found")
+    
+    # Pre-sign Service 가져오기
+    presign_service = OptionPurchaseViewControllers.v1()
+    
+    # Pre-sign 트랜잭션 그래프 생성
+    expiry_timestamp = int((datetime.now() + timedelta(days=7)).timestamp())
+    
+    presign_graph = presign_service.create_option_settlement_graph(
+        bitvmx_protocol_setup_properties_dto=setup_dto,
+        option_type=option_type,
+        strike_price=int(strike_price * 100),  # cents
+        expiry_timestamp=expiry_timestamp,
+        buyer_address=buyer_address
+    )
+    
+    return {
+        "purchase_id": f"PUR-{setup_uuid[:8]}-{int(datetime.now().timestamp())}",
+        "setup_uuid": setup_uuid,
+        "presign_graph": presign_graph,
+        "message": "Pre-signed transactions delivered using BitVMX native presign service"
+    }
 
 
 @router.post("/settle")
 async def settle_option(
-    request: OptionSettlementRequest = Body()
+    setup_uuid: str,
+    oracle_price: float,
+    presign_graph: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    옵션 정산
+    옵션 정산 - BitVMX Pre-sign 실행
     
-    만기 시 옵션을 정산합니다.
+    Oracle 가격으로 Pre-sign 트랜잭션을 실행합니다.
+    기존 BitVMX Input 실행 메커니즘을 활용합니다.
     """
-    try:
-        result = await option_controller.execute_settlement(
-            setup_uuid=request.setup_uuid,
-            price_proof=request.price_proof
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    from prover_app.dependency_injection.api.v1.option import OptionPurchaseViewControllers
+    
+    # Pre-sign Service 가져오기
+    presign_service = OptionPurchaseViewControllers.v1()
+    
+    # Oracle 증명 생성 (실제로는 Oracle Node에서)
+    oracle_proof = {
+        "price": int(oracle_price * 100),
+        "signature": "oracle_signature_placeholder",
+        "merkle_root": "merkle_root_placeholder"
+    }
+    
+    # Pre-sign 정산 실행
+    settlement_txid = presign_service.execute_presigned_settlement(
+        presign_graph=presign_graph,
+        oracle_price=int(oracle_price * 100),
+        oracle_proof=oracle_proof
+    )
+    
+    # ITM/OTM 판단
+    option_type = presign_graph["option_params"]["type"]
+    strike_price = presign_graph["option_params"]["strike"] / 100
+    is_itm = (oracle_price > strike_price) if option_type == "CALL" else (oracle_price < strike_price)
+    
+    return {
+        "settlement_txid": settlement_txid,
+        "oracle_price": oracle_price,
+        "is_itm": is_itm,
+        "message": "Settlement executed using BitVMX native presign"
+    }
 
 
 @router.post("/create-input")
@@ -167,8 +220,9 @@ async def calculate_payoff(
     주어진 파라미터로 옵션 만기 시 수익을 계산합니다.
     """
     try:
-        from prover_app.domain.controllers.v1.option.option_controller import OptionType, OptionParameters
+        from prover_app.domain.controllers.v1.option.option_controller import OptionType, OptionParameters, OptionController
         
+        option_controller = OptionController()
         option_params = OptionParameters(
             option_type=OptionType[option_type],
             strike_price=int(strike_price * 100),

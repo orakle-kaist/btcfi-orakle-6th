@@ -6,10 +6,19 @@ from bitvmx_protocol_library.bitvmx_execution.services.bitvmx_wrapper import Bit
 class ExecutionTraceGenerationService:
 
     @staticmethod
-    def elf_file():
-        # return "plainc.elf"
-        # return "zkverifier.elf"
-        return "test_input.elf"
+    def elf_file(option_type: Optional[str] = None):
+        """
+        옵션 타입에 따라 적절한 ELF 파일 반환
+        """
+        if option_type == "registration":
+            return "option_registration.elf"
+        elif option_type == "purchase":
+            return "option_purchase.elf"
+        elif option_type == "settlement":
+            return "option_settlement.elf"
+        else:
+            # 기본값
+            return "test_input.elf"
 
     # This can be computed on the fly to avoid storing it (it does not take that much time to generate it)
     @staticmethod

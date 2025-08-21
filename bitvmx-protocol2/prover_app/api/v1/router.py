@@ -22,11 +22,8 @@ from prover_app.dependency_injection.api.v1.setup_fund import SetupFundPostViewC
 router = APIRouter()
 
 # 옵션 라우터 추가
-try:
-    from prover_app.api.v1.option.router import router as option_router
-    router.include_router(option_router)
-except ImportError:
-    pass  # 옵션 모듈이 없으면 스킵
+from prover_app.api.v1.option.router import router as option_router
+router.include_router(option_router)
 
 # If this becomes too big, we should create a router inside each folder, overengineering as of now
 
