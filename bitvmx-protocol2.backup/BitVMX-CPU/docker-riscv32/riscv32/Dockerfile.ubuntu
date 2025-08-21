@@ -1,0 +1,62 @@
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    autoconf \
+    automake \
+    autotools-dev \
+    curl \
+    python3 \
+    python3-pip \
+    libmpc-dev \
+    libmpfr-dev \
+    libgmp-dev \
+    gawk \
+    bison \
+    flex \
+    texinfo \
+    gperf \
+    libtool \
+    patchutils \
+    bc \
+    zlib1g-dev \
+    libexpat-dev \
+    ninja-build \
+    vim \
+    dos2unix
+
+# Clone and build RISC-V toolchain
+RUN mkdir /src && \
+    cd /src && \
+    git clone https://github.com/riscv/riscv-gnu-toolchain --branch 2024.09.03
+
+RUN cd /src/riscv-gnu-toolchain/ && \
+    ./configure --prefix=/riscv32 --with-arch=rv32im --with-abi=ilp32 && \
+    make -j$(nproc)
+
+# Get files for multiplication and division
+RUN cd /src && curl -LJO https://github.com/gcc-mirror/gcc/raw/master/libgcc/config/epiphany/mulsi3.c \
+            && curl -LJO https://github.com/gcc-mirror/gcc/raw/master/libgcc/config/riscv/riscv-asm.h \ 
+            && curl -LJO https://github.com/gcc-mirror/gcc/raw/master/libgcc/config/riscv/div.S 
+
+# Install QEMU
+RUN apt-get update && apt-get install -y qemu-user
+
+ENV PATH=/riscv32/bin:$PATH
+
+ENV CC=riscv32-unknown-elf-gcc
+ENV CXX=riscv32-unknown-elf-c++
+ENV CPP=riscv32-unknown-elf-cpp
+ENV AS=riscv32-unknown-elf-as
+ENV LD=riscv32-unknown-elf-ld
+ENV AR=riscv32-unknown-elf-ar
+ENV DUMP=riscv32-unknown-elf-objdump
+ENV RANLIB=riscv32-unknown-elf-ranlib
+ENV HOST=riscv32-unknown-elf
+ENV QEMU=qemu-riscv32
+
+WORKDIR /data
+
+CMD ["/bin/bash"]
