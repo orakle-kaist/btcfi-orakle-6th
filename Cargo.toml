@@ -6,7 +6,7 @@ members = [
     "crates/bitcoin-client",
     "crates/common",
     "calculation",
-    "orchestrator",
+    "orchestrator", "bitvmx-service",
 ]
 resolver = "2"
 

@@ -1,10 +1,11 @@
-// BTCFi Option Registration for BitVMX - Production Version
-// Manual type definitions for bare metal compilation
+// BTCFi Option Registration for BitVMX - Single-sided AMM Version
+// Pool acts as automatic seller, dynamic premium pricing
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
+typedef long long int64_t;
 
 // Manual memory operations
 void* memcpy(void* dest, const void* src, unsigned long n) {
@@ -94,31 +95,61 @@ void sha256(const uint8_t* input, unsigned long len, uint8_t* output) {
     }
 }
 
-// BTCFi Option Registration for BitVMX - Production Version
-// This implements the complete option registration logic for BTCFi Oracle VM
+// BTCFi Option Registration - AMM Single-sided Options
+// Pool automatically acts as option seller (writer)
 
-// Option Registration Input Structure (aligned with Rust BitVMXOptionInput)
+// Pool State from Option Manager
 typedef struct {
-    uint32_t option_type;         // 0=Call, 1=Put
-    uint64_t strike_price;        // USD cents (e.g., 5200000 = $52,000)
-    uint64_t quantity;            // satoshis (e.g., 100000000 = 1.0 BTC)
-    uint64_t premium;             // satoshis
-    uint64_t expiry_timestamp;    // Unix timestamp
-    uint8_t issuer_hash[32];      // SHA256 hash of issuer string
-    uint32_t oracle_count;        // Number of oracle sources
-    uint8_t oracle_hashes[5][8];  // Up to 5 oracle source hashes (8 bytes each)
+    uint64_t total_liquidity;       // Total pool BTC in satoshis
+    uint64_t available_liquidity;   // Available for new options
+    int64_t call_delta_exposure;    // Current CALL delta (positive)
+    int64_t put_delta_exposure;     // Current PUT delta (negative)
+    int64_t net_delta;              // call_delta + put_delta (target: 0)
+    uint64_t total_premium_collected; // Total premiums collected
+    uint32_t max_delta_ratio_bps;   // Max delta/liquidity ratio (e.g., 2000 = 20%)
+} __attribute__((packed)) BTCFiPoolState;
+
+// Option Registration Input (from Option Manager)
+typedef struct {
+    // Option parameters
+    uint32_t option_type;           // 0=Call, 1=Put
+    uint64_t strike_price;          // USD cents
+    uint64_t expiry_timestamp;      // Unix timestamp
+    uint64_t max_size;              // Maximum size in satoshis
+    
+    // Pool state for validation
+    BTCFiPoolState pool_state;      // Current pool state
+    
+    // Market data (from Option Manager)
+    uint64_t current_spot_price;    // Current BTC price in cents
+    uint64_t base_premium_rate;     // Base premium per BTC (before delta adjustment)
+    int64_t option_delta;           // This option's delta (calculated by Option Manager)
+    
+    // Oracle configuration
+    uint32_t oracle_count;          // Must be 3 (Binance, Coinbase, Kraken)
+    uint8_t oracle_hashes[3][8];    // Oracle identifiers
+    uint8_t aggregator_hash[32];    // Oracle aggregator identifier
 } __attribute__((packed)) BTCFiOptionInput;
 
-// Option Registration Output Structure
+// Option Registration Output
 typedef struct {
-    uint8_t option_id[6];          // Generated option ID (first 6 bytes of hash)
+    uint8_t option_id[32];          // Unique option identifier
     uint32_t validation_result;     // 1=valid, 0=invalid
-    uint64_t creation_timestamp;    // When option was created
-    uint8_t registration_hash[32];  // SHA256 of all input data
-    uint32_t btcfi_magic;          // BTCFi protocol magic number
-    uint32_t option_version;       // Option contract version
-    uint64_t minimum_collateral;   // Required collateral in satoshis
-    uint32_t settlement_window;    // Settlement window in blocks
+    
+    // Validation results
+    uint32_t liquidity_check;       // 1=sufficient, 0=insufficient
+    uint32_t delta_check;           // 1=within limits, 0=exceeded
+    uint32_t parameter_check;       // 1=valid, 0=invalid
+    
+    // Pool impact analysis
+    int64_t new_pool_delta;         // Pool delta after this option
+    uint32_t delta_ratio_after_bps; // Delta/liquidity ratio after
+    uint64_t required_collateral;   // Collateral needed from pool
+    
+    // Option metadata
+    uint8_t registration_hash[32];  // Hash of all parameters
+    uint64_t creation_timestamp;    // Registration time
+    uint32_t risk_level;            // 1=low, 2=medium, 3=high
 } __attribute__((packed)) BTCFiOptionOutput;
 
 // BTCFi Protocol Constants
@@ -132,56 +163,81 @@ typedef struct {
 #define SETTLEMENT_BLOCKS 144         // ~24 hours in blocks
 #define COLLATERAL_RATIO 110          // 110% collateral requirement
 
-// Enhanced validation function with BTCFi specific rules
-uint32_t validate_btcfi_option(const BTCFiOptionInput* input) {
+// Validate basic option parameters
+uint32_t validate_parameters(const BTCFiOptionInput* input) {
     // 1. Option type validation
     if (input->option_type > 1) {
         return 0;
     }
     
-    // 2. Strike price validation with BTCFi limits
+    // 2. Strike price validation
     if (input->strike_price < MIN_STRIKE_PRICE || 
         input->strike_price > MAX_STRIKE_PRICE) {
         return 0;
     }
     
-    // 3. Quantity validation with BTCFi limits
-    if (input->quantity < MIN_QUANTITY || 
-        input->quantity > MAX_QUANTITY) {
+    // 3. Size validation
+    if (input->max_size < MIN_QUANTITY || 
+        input->max_size > MAX_QUANTITY) {
         return 0;
     }
     
-    // 4. Premium validation
-    if (input->premium < MIN_PREMIUM) {
+    // 4. Expiry validation (1 hour to 1 year)
+    uint64_t current_time = input->pool_state.total_premium_collected > 0 ? 1700000000 : 1700000000;
+    if (input->expiry_timestamp < current_time + 3600 || 
+        input->expiry_timestamp > current_time + 365 * 24 * 3600) {
         return 0;
     }
     
-    // 5. Expiry timestamp validation (must be in future, max 1 year)
-    if (input->expiry_timestamp < 1700000000 || // After 2023
-        input->expiry_timestamp > 1700000000 + 365 * 24 * 3600) { // Max 1 year
+    // 5. Oracle count must be exactly 3
+    if (input->oracle_count != 3) {
         return 0;
     }
     
-    // 6. Oracle count validation (minimum 3 for consensus)
-    if (input->oracle_count < 3 || input->oracle_count > 5) {
-        return 0;
-    }
-    
-    // 7. Issuer hash validation (cannot be all zeros)
-    uint32_t issuer_sum = 0;
+    // 6. Aggregator hash must exist
+    uint32_t agg_sum = 0;
     for (int i = 0; i < 32; i++) {
-        issuer_sum += input->issuer_hash[i];
+        agg_sum += input->aggregator_hash[i];
     }
-    if (issuer_sum == 0) {
+    if (agg_sum == 0) {
         return 0;
     }
     
-    // 8. Premium reasonableness check (max 50% of quantity)
-    if (input->premium > input->quantity / 2) {
-        return 0;
+    return 1;
+}
+
+// Check if pool has sufficient liquidity
+uint32_t check_pool_liquidity(const BTCFiOptionInput* input, uint64_t* required_collateral) {
+    // Calculate required collateral based on option type
+    if (input->option_type == 0) { // CALL
+        // For calls, need to collateralize with BTC
+        *required_collateral = input->max_size;
+    } else { // PUT
+        // For puts, need to collateralize with USD equivalent
+        *required_collateral = udiv64(
+            umul64(input->strike_price, input->max_size),
+            input->current_spot_price
+        );
     }
     
-    return 1; // Valid
+    // Check if pool has enough available liquidity
+    return (input->pool_state.available_liquidity >= *required_collateral) ? 1 : 0;
+}
+
+// Check if adding this option would exceed delta limits
+uint32_t check_delta_limits(const BTCFiOptionInput* input, int64_t* new_delta, uint32_t* ratio_after) {
+    // Calculate new pool delta
+    *new_delta = input->pool_state.net_delta + input->option_delta;
+    
+    // Calculate delta/liquidity ratio
+    uint64_t abs_delta = (*new_delta < 0) ? (uint64_t)(-*new_delta) : (uint64_t)*new_delta;
+    *ratio_after = (uint32_t)udiv64(
+        umul64(abs_delta, 10000),
+        input->pool_state.total_liquidity
+    );
+    
+    // Check against maximum allowed ratio
+    return (*ratio_after <= input->pool_state.max_delta_ratio_bps) ? 1 : 0;
 }
 
 // Generate unique option ID using SHA256
@@ -204,11 +260,12 @@ uint64_t calculate_minimum_collateral(const BTCFiOptionInput* input) {
     uint64_t base_collateral;
     
     if (input->option_type == 0) { // Call option
-        // For calls, collateral is based on quantity (underlying asset)
-        base_collateral = input->quantity;
+        // For calls, collateral is based on max size (underlying asset)
+        base_collateral = input->max_size;
     } else { // Put option
         // For puts, collateral is based on strike price
-        base_collateral = udiv64(umul64(input->strike_price, input->quantity), 100); // Convert cents to sats
+        base_collateral = udiv64(umul64(input->strike_price, input->max_size), 
+                                input->current_spot_price); // Convert to BTC
     }
     
     // Apply collateral ratio (110%)
@@ -231,41 +288,54 @@ void compute_btcfi_registration_hash(const BTCFiOptionInput* input, uint8_t* reg
     sha256(hash_buffer, sizeof(hash_buffer), reg_hash);
 }
 
-// Main option registration function
+// Main registration function - validates pool can write this option
 int main(int argc) {
-    // Read input data from BitVMX input address
     BTCFiOptionInput* input = (BTCFiOptionInput*)INPUT_ADDRESS;
     BTCFiOptionOutput output;
     
-    // Initialize output structure
     memset(&output, 0, sizeof(output));
     
-    print_literal("=== BTCFi Option Registration on BitVMX ===\n", 44);
+    print_literal("=== BTCFi AMM Option Registration ===\n", 38);
+    print_literal("Pool acts as automatic option writer\n", 37);
     
-    // Validate option parameters
-    output.validation_result = validate_btcfi_option(input);
+    // 1. Validate basic parameters
+    output.parameter_check = validate_parameters(input);
+    
+    // 2. Check pool liquidity
+    uint64_t required_collateral = 0;
+    output.liquidity_check = check_pool_liquidity(input, &required_collateral);
+    output.required_collateral = required_collateral;
+    
+    // 3. Check delta limits
+    int64_t new_delta = 0;
+    uint32_t ratio_after = 0;
+    output.delta_check = check_delta_limits(input, &new_delta, &ratio_after);
+    output.new_pool_delta = new_delta;
+    output.delta_ratio_after_bps = ratio_after;
+    
+    // Overall validation
+    output.validation_result = output.parameter_check && 
+                              output.liquidity_check && 
+                              output.delta_check;
     
     if (output.validation_result) {
-        print_literal("✅ Option validation: PASSED\n", 29);
+        print_literal("✅ Registration APPROVED\n", 25);
         
-        // Generate unique option ID
-        generate_btcfi_option_id(input, output.option_id);
+        // Generate option ID
+        sha256((uint8_t*)input, sizeof(BTCFiOptionInput), output.option_id);
         
-        // Set creation timestamp (simplified - use expiry minus 30 days)
+        // Set metadata
         output.creation_timestamp = input->expiry_timestamp - (30 * 24 * 3600);
+        sha256((uint8_t*)input, sizeof(BTCFiOptionInput), output.registration_hash);
         
-        // Generate registration hash
-        compute_btcfi_registration_hash(input, output.registration_hash);
-        
-        // Set BTCFi protocol fields
-        output.btcfi_magic = BTCFI_MAGIC;
-        output.option_version = OPTION_VERSION;
-        
-        // Calculate minimum collateral
-        output.minimum_collateral = calculate_minimum_collateral(input);
-        
-        // Set settlement window
-        output.settlement_window = SETTLEMENT_BLOCKS;
+        // Assess risk level
+        if (ratio_after > 1500) { // > 15% delta
+            output.risk_level = 3; // High
+        } else if (ratio_after > 1000) { // > 10% delta
+            output.risk_level = 2; // Medium
+        } else {
+            output.risk_level = 1; // Low
+        }
         
         // Output option details for verification
         print_literal("📊 Option Details:\n", 19);
@@ -281,11 +351,11 @@ int main(int argc) {
         // Note: In production, implement proper number printing
         print_literal("[STRIKE_PRICE]\n", 15);
         
-        print_literal("   Quantity: ", 13);
-        print_literal("[QUANTITY] BTC\n", 15);
+        print_literal("   Max Size: ", 13);
+        print_literal("[MAX_SIZE] sats\n", 16);
         
-        print_literal("   Premium: ", 12);
-        print_literal("[PREMIUM] sats\n", 15);
+        print_literal("   Collateral: ", 15);
+        print_literal("[COLLATERAL] sats\n", 18);
         
         print_literal("   Oracle Count: ", 16);
         if (input->oracle_count == 3) {
@@ -298,8 +368,14 @@ int main(int argc) {
         // In production, implement hex printing for option_id
         print_literal("[OPTION_ID_HEX]\n", 16);
         
-        print_literal("   Min Collateral: ", 17);
-        print_literal("[COLLATERAL] sats\n", 18);
+        print_literal("   Risk Level: ", 14);
+        if (output.risk_level == 1) {
+            print_literal("LOW\n", 4);
+        } else if (output.risk_level == 2) {
+            print_literal("MEDIUM\n", 7);
+        } else {
+            print_literal("HIGH\n", 5);
+        }
         
         print_literal("✅ Registration: SUCCESS\n", 25);
         
@@ -354,7 +430,8 @@ uint32_t calculate_option_delta(uint32_t option_type, uint64_t strike, uint64_t 
 
 // Risk assessment for the option
 uint32_t assess_option_risk(const BTCFiOptionInput* input) {
-    uint64_t notional_value = udiv64(umul64(input->strike_price, input->quantity), 100);
+    uint64_t notional_value = udiv64(umul64(input->strike_price, input->max_size), 
+                                     input->current_spot_price);
     
     // High risk if notional > 10 BTC worth
     if (notional_value > 1000000000) { // > 10 BTC in sats
