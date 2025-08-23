@@ -29,7 +29,8 @@ class OptionPurchaseViewControllers:
     @staticmethod
     def v1():
         # 운영자 키 (실제로는 환경변수에서)
-        operator_key = PrivateKey("cVdte9ei2xsVjB8YvySNSkHpEQJ5VHhTjq5BvkBytbgNrWNgz4Xq")
+        # Hex 형식의 private key 사용
+        operator_key = PrivateKey(secret_exponent=int("d8a1e1224e63135765bde9dc8a2c8e403eee8be73d3589d58c5ddbf9dce3fdf4", 16))
         
         # BitVMX Native Pre-sign Service 인스턴스
         presign_service = BitVMXNativePresignService(operator_key)

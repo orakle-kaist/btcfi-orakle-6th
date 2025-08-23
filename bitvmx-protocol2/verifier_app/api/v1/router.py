@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Body
 
-from verifier_app.api.v1.next_step.crud.v1.view_models.post import NextStepPostV1Input
-from verifier_app.api.v1.public_keys.crud.v1.view_models.post import PublicKeysPostV1Input
-from verifier_app.api.v1.setup.crud.v1.view_models.post import SetupPostV1Input
-from verifier_app.api.v1.signatures.crud.v1.view_models.post import SignaturesPostV1Input
+from verifier_app.api.v1.next_step.crud.view_models.post import NextStepPostV1Input
+from verifier_app.api.v1.public_keys.crud.view_models.post import PublicKeysPostV1Input
+from verifier_app.api.v1.setup.crud.view_models.post import SetupPostV1Input
+from verifier_app.api.v1.signatures.crud.view_models.post import SignaturesPostV1Input
 from verifier_app.dependency_injection.api.v1.view_controllers.next_step import (
     NextStepPostViewControllers,
 )

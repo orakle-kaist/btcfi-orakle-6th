@@ -1,0 +1,278 @@
+{
+  "OPT-f398223f": {
+    "product_id": "OPT-f398223f",
+    "setup_uuid": "de15532d-2201-43ba-af2a-912cfd54248c",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-29T10:29:42.324206",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-22T10:29:42.324574",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-bc35f824": {
+    "product_id": "OPT-bc35f824",
+    "setup_uuid": "de15532d-2201-43ba-af2a-912cfd54248c",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-29T10:59:14.200659",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-22T10:59:14.201240",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-734598c7": {
+    "product_id": "OPT-734598c7",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T04:00:48.173912",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T04:00:48.175897",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-3783bdf8": {
+    "product_id": "OPT-3783bdf8",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T04:08:31.026406",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T04:08:31.026686",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-bfebbdef": {
+    "product_id": "OPT-bfebbdef",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T04:29:19.705859",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T04:29:19.709699",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-ca26d382": {
+    "product_id": "OPT-ca26d382",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T04:29:57.079626",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T04:29:57.079812",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-3e099ab4": {
+    "product_id": "OPT-3e099ab4",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T04:31:37.853585",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T04:31:37.853741",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-aafaadff": {
+    "product_id": "OPT-aafaadff",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T04:31:37.860209",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T04:31:37.860224",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-ddba2f9d": {
+    "product_id": "OPT-ddba2f9d",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T04:42:50.612529",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T04:42:50.614559",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-a71b946f": {
+    "product_id": "OPT-a71b946f",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T04:53:56.350126",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T04:53:56.353409",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-91b3d56f": {
+    "product_id": "OPT-91b3d56f",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T05:17:20.188093",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T05:17:20.190805",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  },
+  "OPT-827d2e19": {
+    "product_id": "OPT-827d2e19",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "option_type": "CALL",
+    "strike_price": 50000.0,
+    "expiry_date": "2025-08-30T05:28:54.329640",
+    "premium_btc": 0.001,
+    "quantity": 1.0,
+    "status": "ACTIVE",
+    "created_at": "2025-08-23T05:28:54.331099",
+    "pool_size_btc": 1.39,
+    "greeks": {
+      "delta": null,
+      "gamma": null,
+      "theta": null,
+      "vega": null
+    },
+    "settlement": {
+      "price": null,
+      "txid": null,
+      "date": null
+    }
+  }
+}

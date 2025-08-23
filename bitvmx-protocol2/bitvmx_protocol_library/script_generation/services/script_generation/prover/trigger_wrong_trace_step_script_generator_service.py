@@ -29,9 +29,15 @@ class TriggerWrongTraceStepScriptGeneratorService:
     ):
         script = BitcoinScript()
         for signature_public_key in signature_public_keys:
+            # Handle both string and PublicKey object types
+            if isinstance(signature_public_key, str):
+                public_key_obj = PublicKey.from_hex(signature_public_key)
+            else:
+                public_key_obj = signature_public_key
+            
             script.extend(
                 [
-                    PublicKey(hex_str=signature_public_key).to_x_only_hex(),
+                    public_key_obj.to_x_only_hex(),
                     "OP_CHECKSIGVERIFY",
                 ]
             )

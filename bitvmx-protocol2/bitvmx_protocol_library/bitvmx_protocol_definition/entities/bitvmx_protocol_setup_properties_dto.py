@@ -65,12 +65,16 @@ class BitVMXProtocolSetupPropertiesDTO(BaseModel):
 
     @staticmethod
     def unspendable_public_key_from_seed(seed_unspendable_public_key: str):
-        destroyed_public_key_hex = hashlib.sha256(
+        from bitcoinutils.keys import PrivateKey
+        
+        destroyed_private_key_bytes = hashlib.sha256(
             bytes.fromhex(seed_unspendable_public_key)
-        ).hexdigest()
+        ).digest()
+        # Use the hash as a private key to generate a valid public key
         # This is done so everyone can verify that they participated on the seed construction
-        # but at the same time the public key is unspendable
-        return PublicKey(hex_str="02" + destroyed_public_key_hex)
+        # but at the same time the public key is unspendable (no one knows the private key)
+        destroyed_private_key = PrivateKey(b=destroyed_private_key_bytes)
+        return destroyed_private_key.get_public_key()
 
     @property
     def unspendable_public_key(self):

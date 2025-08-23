@@ -3,18 +3,34 @@ from dependency_injector import containers, providers
 from bitvmx_protocol_library.bitvmx_protocol_definition.services.public_keys_generation.generate_prover_public_keys_service import (
     GenerateProverPublicKeysService,
 )
-from bitvmx_protocol_library.script_generation.services.bitvmx_bitcoin_scripts_generator_service import (
-    BitVMXBitcoinScriptsGeneratorService,
-)
+# Try to import optimized script generator first
+try:
+    from bitvmx_protocol_library.script_generation.services.bitvmx_bitcoin_scripts_generator_service_optimized import (
+        BitVMXBitcoinScriptsGeneratorServiceOptimized as BitVMXBitcoinScriptsGeneratorService,
+    )
+    print("[OPTIMIZED] Using optimized BitVMXBitcoinScriptsGeneratorService")
+except ImportError:
+    from bitvmx_protocol_library.script_generation.services.bitvmx_bitcoin_scripts_generator_service import (
+        BitVMXBitcoinScriptsGeneratorService,
+    )
+    print("[WARNING] Using standard BitVMXBitcoinScriptsGeneratorService")
 from bitvmx_protocol_library.transaction_generation.services.generate_signatures_service import (
     GenerateSignaturesService,
 )
 from bitvmx_protocol_library.transaction_generation.services.signature_verification.verify_verifier_signatures_service import (
     VerifyVerifierSignaturesService,
 )
-from bitvmx_protocol_library.transaction_generation.services.transaction_generator_from_public_keys_service import (
-    TransactionGeneratorFromPublicKeysService,
-)
+# Try to import optimized version first
+try:
+    from bitvmx_protocol_library.transaction_generation.services.transaction_generator_from_public_keys_service_optimized import (
+        TransactionGeneratorFromPublicKeysServiceOptimized as TransactionGeneratorFromPublicKeysService,
+    )
+    print("[OPTIMIZED] Using optimized TransactionGeneratorFromPublicKeysService")
+except ImportError:
+    from bitvmx_protocol_library.transaction_generation.services.transaction_generator_from_public_keys_service import (
+        TransactionGeneratorFromPublicKeysService,
+    )
+    print("[WARNING] Using standard TransactionGeneratorFromPublicKeysService")
 from blockchain_query_services.services.blockchain_query_services_dependency_injection import (
     broadcast_transaction_service,
     faucet_service,

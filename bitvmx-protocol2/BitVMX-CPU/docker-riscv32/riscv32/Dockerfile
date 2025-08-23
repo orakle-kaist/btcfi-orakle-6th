@@ -21,13 +21,10 @@ RUN cd /src && curl -LJO https://github.com/gcc-mirror/gcc/raw/master/libgcc/con
 
 
 # Define a build argument (default to false)
-ARG INSTALL_QEMU=true
+ARG INSTALL_QEMU=false
 
-# Update the package manager and optionally install qemu-full based on the argument
-RUN pacman -Sy --noconfirm && \
-    if [ "$INSTALL_QEMU" = "true" ]; then \
-        pacman -S --noconfirm qemu-full; \
-    fi
+# Skip QEMU installation for now (dependency issues)
+RUN pacman -Sy --noconfirm
 
 RUN pacman -Sy --noconfirm dos2unix
 

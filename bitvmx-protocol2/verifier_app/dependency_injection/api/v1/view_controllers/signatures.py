@@ -1,6 +1,6 @@
 from dependency_injector import containers, providers
 
-from verifier_app.api.v1.signatures.crud.v1.view_controllers.post import (
+from verifier_app.api.v1.signatures.crud.view_controllers.post import (
     SignaturesPostViewControllerV1,
 )
 from verifier_app.dependency_injection.domain.v1.controllers.generate_signatures import (

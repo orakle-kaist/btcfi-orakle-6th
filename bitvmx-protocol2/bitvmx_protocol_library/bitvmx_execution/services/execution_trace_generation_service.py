@@ -22,17 +22,26 @@ class ExecutionTraceGenerationService:
 
     # This can be computed on the fly to avoid storing it (it does not take that much time to generate it)
     @staticmethod
-    def commitment_file():
-        if ExecutionTraceGenerationService.elf_file() == "zkverifier.elf":
+    def commitment_file(elf_file_name: Optional[str] = None):
+        if not elf_file_name:
+            elf_file_name = ExecutionTraceGenerationService.elf_file()
+            
+        if elf_file_name == "zkverifier.elf":
             return "./execution_files/instruction_commitment_zk.txt"
-        elif ExecutionTraceGenerationService.elf_file() == "plainc.elf":
+        elif elf_file_name == "plainc.elf":
             return "./execution_files/instruction_commitment.txt"
-        elif ExecutionTraceGenerationService.elf_file() == "test_input.elf":
+        elif elf_file_name == "test_input.elf":
+            return "./execution_files/instruction_commitment_input.txt"
+        elif elf_file_name.startswith("option_"):
+            # 옵션 관련 ELF 파일들은 공통 commitment 사용
+            return "./execution_files/instruction_commitment.txt"
+        else:
             return "./execution_files/instruction_commitment_input.txt"
 
-    def __init__(self, base_path: str):
+    def __init__(self, base_path: str, option_type: Optional[str] = None):
         self.base_path = base_path
-        self.elf_file_name = self.elf_file()
+        self.option_type = option_type
+        self.elf_file_name = self.elf_file(option_type)
         self.bitvmx_wrapper = BitVMXWrapper(base_path)
 
     def __call__(self, setup_uuid: str, input_hex: Optional[str] = None):

@@ -55,6 +55,7 @@ class GenerateSignaturesController:
         self,
         setup_uuid: str,
         bitvmx_prover_signatures_dto: BitVMXProverSignaturesDTO,
+        bitvmx_protocol_setup_properties_dto=None,  # Optional parameter from prover
     ) -> BitVMXVerifierSignaturesDTO:
         init_time = time()
         if self.common_protocol_properties.network == BitcoinNetwork.MUTINYNET:
@@ -69,9 +70,18 @@ class GenerateSignaturesController:
             b=bytes.fromhex(bitvmx_protocol_verifier_private_dto.destroyed_private_key)
         )
 
-        bitvmx_protocol_setup_properties_dto = (
-            self.bitvmx_protocol_setup_properties_dto_persistence.get(setup_uuid=setup_uuid)
-        )
+        # Use the DTO from prover if provided, otherwise fetch from storage
+        if bitvmx_protocol_setup_properties_dto is None:
+            bitvmx_protocol_setup_properties_dto = (
+                self.bitvmx_protocol_setup_properties_dto_persistence.get(setup_uuid=setup_uuid)
+            )
+        else:
+            # Convert dict to DTO object if needed
+            from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_setup_properties_dto import (
+                BitVMXProtocolSetupPropertiesDTO,
+            )
+            if isinstance(bitvmx_protocol_setup_properties_dto, dict):
+                bitvmx_protocol_setup_properties_dto = BitVMXProtocolSetupPropertiesDTO(**bitvmx_protocol_setup_properties_dto)
 
         verify_prover_signatures_service = self.verify_prover_signatures_service_class(
             bitvmx_protocol_setup_properties_dto.unspendable_public_key

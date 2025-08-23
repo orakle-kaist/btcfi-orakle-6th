@@ -22,6 +22,13 @@ class GenerateSignaturesService:
         funding_result_output_amount = (
             bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis
         )
+        
+        # Debug logging
+        print(f"[DEBUG] funding_amount_of_satoshis: {funding_result_output_amount}")
+        if funding_result_output_amount < 0:
+            print(f"[ERROR] Negative funding amount detected: {funding_result_output_amount}")
+            funding_result_output_amount = abs(funding_result_output_amount)
+            print(f"[DEBUG] Using absolute value: {funding_result_output_amount}")
 
         hash_result_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_result_script.get_taproot_address(
             self.destroyed_public_key

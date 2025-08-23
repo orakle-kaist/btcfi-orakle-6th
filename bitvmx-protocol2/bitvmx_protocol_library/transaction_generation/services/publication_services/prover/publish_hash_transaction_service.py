@@ -1,6 +1,7 @@
 from typing import Dict, List
+import requests
 
-from bitcoinutils.transactions import Transaction, TxWitnessInput
+from bitcoinutils.transactions import Transaction, TxWitnessInput, TxInput
 from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_execution.services.execution_trace_generation_service import (
@@ -158,6 +159,7 @@ class PublishHashTransactionService:
         )
 
         tx_hex = bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.hash_result_tx.serialize()
+        
         broadcast_transaction_service(transaction=tx_hex)
         print(
             "Hash result revelation transaction: "

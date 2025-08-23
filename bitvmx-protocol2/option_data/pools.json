@@ -1,0 +1,50 @@
+{
+  "POOL-de15532d": {
+    "pool_id": "POOL-de15532d",
+    "setup_uuid": "de15532d-2201-43ba-af2a-912cfd54248c",
+    "total_size_btc": 1.39,
+    "available_btc": 1.1899999999999997,
+    "locked_btc": 0.2,
+    "net_delta": 0.0,
+    "target_delta": 0.0,
+    "active_options": [
+      "OPT-f398223f",
+      "OPT-bc35f824"
+    ],
+    "statistics": {
+      "total_premium_collected": 0.001,
+      "total_payouts": 0.0,
+      "profit": 0.001
+    },
+    "created_at": "2025-08-22T10:29:42.323353",
+    "last_updated": "2025-08-22T10:59:14.204945"
+  },
+  "POOL-84e9d815": {
+    "pool_id": "POOL-84e9d815",
+    "setup_uuid": "84e9d815-5227-41ff-a0eb-b898456294cf",
+    "total_size_btc": 1.39,
+    "available_btc": 0.3899999999999998,
+    "locked_btc": 0.9999999999999999,
+    "net_delta": 0.0,
+    "target_delta": 0.0,
+    "active_options": [
+      "OPT-734598c7",
+      "OPT-3783bdf8",
+      "OPT-bfebbdef",
+      "OPT-ca26d382",
+      "OPT-3e099ab4",
+      "OPT-aafaadff",
+      "OPT-ddba2f9d",
+      "OPT-a71b946f",
+      "OPT-91b3d56f",
+      "OPT-827d2e19"
+    ],
+    "statistics": {
+      "total_premium_collected": 0.001,
+      "total_payouts": 0.0,
+      "profit": 0.001
+    },
+    "created_at": "2025-08-23T04:00:48.161845",
+    "last_updated": "2025-08-23T05:28:54.340467"
+  }
+}

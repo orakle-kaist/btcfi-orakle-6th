@@ -1,5 +1,7 @@
 from http import HTTPStatus
 from time import time
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from bitcoinutils.keys import PrivateKey
 from bitcoinutils.setup import get_network
@@ -9,12 +11,20 @@ from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol
     BitVMXProtocolSetupPropertiesDTO,
 )
 from bitvmx_protocol_library.enums import BitcoinNetwork
-from bitvmx_protocol_library.script_generation.services.bitvmx_bitcoin_scripts_generator_service import (
-    BitVMXBitcoinScriptsGeneratorService,
+from bitvmx_protocol_library.script_generation.services.bitvmx_bitcoin_scripts_generator_service_optimized import (
+    BitVMXBitcoinScriptsGeneratorServiceOptimized as BitVMXBitcoinScriptsGeneratorService,
 )
 from bitvmx_protocol_library.transaction_generation.services.transaction_generator_from_public_keys_service import (
     TransactionGeneratorFromPublicKeysService,
 )
+# Import optimized services
+try:
+    from bitvmx_protocol_library.transaction_generation.services.transaction_generator_service_optimized import (
+        TransactionGeneratorServiceOptimized,
+    )
+    USE_OPTIMIZED = True
+except ImportError:
+    USE_OPTIMIZED = False
 from verifier_app.domain.persistences.interfaces.bitvmx_protocol_setup_properties_dto_persistence_interface import (
     BitVMXProtocolSetupPropertiesDTOPersistenceInterface,
 )

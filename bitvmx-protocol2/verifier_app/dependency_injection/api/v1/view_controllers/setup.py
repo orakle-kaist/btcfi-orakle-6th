@@ -1,6 +1,6 @@
 from dependency_injector import containers, providers
 
-from verifier_app.api.v1.setup.crud.v1.view_controllers.post import SetupPostViewControllerV1
+from verifier_app.api.v1.setup.crud.view_controllers.post import SetupPostViewControllerV1
 from verifier_app.dependency_injection.domain.v1.controllers.create_setup import (
     CreateSetupControllers,
 )

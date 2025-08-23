@@ -1,9 +1,6 @@
 services:
   prover-backend:
-    build:
-      context: .
-      target: prover-backend
-    image: prover-backend
+    image: wooss97/bitvmx-prover:latest
     env_file:
      - .env_common
      - .env_prover
@@ -19,10 +16,7 @@ services:
       - bitvmx-net
 
   verifier-backend:
-    build:
-      context: .
-      target: verifier-backend
-    image: verifier-backend
+    image: wooss97/bitvmx-verifier:latest
     env_file:
      - .env_common
      - .env_verifier

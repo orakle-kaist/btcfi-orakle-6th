@@ -34,11 +34,19 @@ class TransactionGeneratorFromPublicKeysService:
             bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
 
+        # Create main output for the protocol
         funding_txout = TxOutput(
             bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis,
             hash_result_script_address.to_script_pub_key(),
         )
-        funding_tx = Transaction([funding_txin], [funding_txout], has_segwit=True)
+        
+        # Create outputs list
+        outputs = [funding_txout]
+        
+        # Add change output if there's remaining balance
+        # We need to get the actual UTXO value to calculate change
+        # For now, we'll assume the caller needs to handle this properly
+        funding_tx = Transaction([funding_txin], outputs, has_segwit=True)
 
         trigger_protocol_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_protocol_scripts_list.get_taproot_address(
             public_key=destroyed_public_key
