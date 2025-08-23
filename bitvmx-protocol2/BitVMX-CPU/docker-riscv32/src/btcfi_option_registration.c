@@ -1,6 +1,19 @@
 // BTCFi Option Registration for BitVMX - Single-sided AMM Version
 // Pool acts as automatic seller, dynamic premium pricing
 
+// Entry point for bare metal RISC-V
+__asm__(
+    ".section .text.entry\n"
+    ".global _start\n"
+    "_start:\n"
+    "    lui sp, 0xE0001\n"      // Set stack pointer to 0xE0001000 (stack section + offset)
+    "    call main\n"             // Call main function
+    "1:  j 1b\n"                  // Infinite loop after main returns
+);
+
+// Allocate space for input section
+__attribute__((section(".input"))) unsigned char input_buffer[4096] = {0};
+
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
