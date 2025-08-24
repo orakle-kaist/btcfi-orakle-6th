@@ -6,7 +6,7 @@ from bitcoinutils.keys import PrivateKey
 from fastapi import HTTPException
 
 from bitvmx_protocol_library.enums import BitcoinNetwork
-from prover_app.api.v1.setup.crud.view_models.post import SetupPostV1Input
+from prover_app.api.v1.setup.crud.v1.view_models.post import SetupPostV1Input
 
 
 class CreateSetupWithFundingController:

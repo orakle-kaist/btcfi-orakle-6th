@@ -220,6 +220,19 @@ class GenerateSignaturesService:
         )
         read_search_choice_signatures.append(first_read_search_choice_signature)
 
+        # Debug transaction lists
+        print(f"[DEBUG] Transactions DTO exists: {bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto is not None}")
+        if bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto:
+            print(f"[DEBUG] read_search_hash_tx_list length: {len(bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.read_search_hash_tx_list) if hasattr(bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto, 'read_search_hash_tx_list') else 'No attribute'}")
+            print(f"[DEBUG] search_hash_tx_list length: {len(bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.search_hash_tx_list) if hasattr(bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto, 'search_hash_tx_list') else 'No attribute'}")
+            print(f"[DEBUG] read_search_choice_tx_list length: {len(bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.read_search_choice_tx_list) if hasattr(bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto, 'read_search_choice_tx_list') else 'No attribute'}")
+
+        # Guard against empty transaction lists
+        if not bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.read_search_hash_tx_list:
+            raise ValueError("No search-hash transactions generated (funding/fee/steps mismatch). Check funding amount and fees.")
+        if not bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.read_search_choice_tx_list:
+            raise ValueError("No search-choice transactions generated. Check funding amount and fees.")
+
         for i in range(
             len(bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.search_hash_tx_list)
             - 1

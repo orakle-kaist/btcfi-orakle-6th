@@ -58,6 +58,8 @@ class GenerateSignaturesController:
         bitvmx_protocol_setup_properties_dto=None,  # Optional parameter from prover
     ) -> BitVMXVerifierSignaturesDTO:
         init_time = time()
+        print(f"[SIGNATURES] Generate signatures for setup_uuid: {setup_uuid}")
+        
         if self.common_protocol_properties.network == BitcoinNetwork.MUTINYNET:
             assert get_network() == "testnet"
         else:
@@ -66,6 +68,14 @@ class GenerateSignaturesController:
         bitvmx_protocol_verifier_private_dto = (
             self.bitvmx_protocol_verifier_private_dto_persistence.get(setup_uuid=setup_uuid)
         )
+        
+        if not bitvmx_protocol_verifier_private_dto:
+            print(f"[ERROR] No private DTO found for setup_uuid: {setup_uuid}")
+            raise ValueError(f"No private key found for setup_uuid: {setup_uuid}")
+        
+        if not bitvmx_protocol_verifier_private_dto.destroyed_private_key:
+            print(f"[ERROR] Private DTO has no destroyed_private_key for setup_uuid: {setup_uuid}")
+            raise ValueError(f"Private DTO has no destroyed_private_key for setup_uuid: {setup_uuid}")
         destroyed_private_key = PrivateKey(
             b=bytes.fromhex(bitvmx_protocol_verifier_private_dto.destroyed_private_key)
         )
@@ -82,6 +92,22 @@ class GenerateSignaturesController:
             )
             if isinstance(bitvmx_protocol_setup_properties_dto, dict):
                 bitvmx_protocol_setup_properties_dto = BitVMXProtocolSetupPropertiesDTO(**bitvmx_protocol_setup_properties_dto)
+        
+        # Apply fallback mapping if read_search_* lists are empty
+        if bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto:
+            txdto = bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto
+            
+            # Check and fallback for read_search_hash_tx_list
+            if hasattr(txdto, 'read_search_hash_tx_list') and hasattr(txdto, 'search_hash_tx_list'):
+                if not txdto.read_search_hash_tx_list and txdto.search_hash_tx_list:
+                    txdto.read_search_hash_tx_list = txdto.search_hash_tx_list
+                    print("[VERIFIER] Fallback: read_search_hash_tx_list <- search_hash_tx_list")
+            
+            # Check and fallback for read_search_choice_tx_list
+            if hasattr(txdto, 'read_search_choice_tx_list') and hasattr(txdto, 'search_choice_tx_list'):
+                if not txdto.read_search_choice_tx_list and txdto.search_choice_tx_list:
+                    txdto.read_search_choice_tx_list = txdto.search_choice_tx_list
+                    print("[VERIFIER] Fallback: read_search_choice_tx_list <- search_choice_tx_list")
 
         verify_prover_signatures_service = self.verify_prover_signatures_service_class(
             bitvmx_protocol_setup_properties_dto.unspendable_public_key

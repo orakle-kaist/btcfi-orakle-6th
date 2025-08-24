@@ -31,6 +31,9 @@ class TriggerWrongTraceStepScriptGeneratorService:
         for signature_public_key in signature_public_keys:
             # Handle both string and PublicKey object types
             if isinstance(signature_public_key, str):
+                if not signature_public_key or len(signature_public_key) < 66:
+                    print(f"[ERROR] Invalid signature_public_key: '{signature_public_key}' (length: {len(signature_public_key) if signature_public_key else 0})")
+                    continue
                 public_key_obj = PublicKey.from_hex(signature_public_key)
             else:
                 public_key_obj = signature_public_key

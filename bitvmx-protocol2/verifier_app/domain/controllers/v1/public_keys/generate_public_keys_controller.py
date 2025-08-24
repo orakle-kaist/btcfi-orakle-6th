@@ -95,15 +95,21 @@ class GeneratePublicKeysController:
             bitvmx_protocol_properties_dto=bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto
         )
         print("Call generate scripts: " + str(time() - init_time))
+        t0 = time()
         bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto = (
             self.bitvmx_bitcoin_scripts_generator_service(
                 bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,
             )
         )
+        print(f"[TIMING] Script generation took: {time() - t0:.2f}s")
+        
         print("Call compute trigger trace challenge address: " + str(time() - init_time))
+        t1 = time()
         bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(
             destroyed_public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
         )
+        print(f"[TIMING] Trigger trace challenge took: {time() - t1:.2f}s")
+        
         print("Call transactions time: " + str(time() - init_time))
         
         # Set verifier destination address for Mutinynet
@@ -114,11 +120,14 @@ class GeneratePublicKeysController:
                 "tb1q8fg5jrspc7fn8jvpe5tfr7e5dlwvsh6xw8cq4j"
             )
         
+        # Transaction generation is required for signature generation
+        t2 = time()
         bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto = (
             self.transaction_generator_from_public_keys_service(
                 bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,
             )
         )
+        print(f"[TIMING] Transaction generation took: {time() - t2:.2f}s")
         print("Call create protocol setup properties time: " + str(time() - init_time))
         self.bitvmx_protocol_setup_properties_dto_persistence.create(
             bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto

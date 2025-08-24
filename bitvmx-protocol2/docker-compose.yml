@@ -4,6 +4,10 @@ services:
     env_file:
      - .env_common
      - .env_prover
+    environment:
+      - HASH_FEES_SATOSHIS=1000
+      - CHOICE_FEES_SATOSHIS=1000
+      - TRIGGER_FEES_SATOSHIS=2000
     volumes:
       - type: bind
         source: .
