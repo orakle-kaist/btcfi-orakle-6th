@@ -20,17 +20,11 @@ from bitvmx_protocol_library.transaction_generation.services.generate_signatures
 from bitvmx_protocol_library.transaction_generation.services.signature_verification.verify_verifier_signatures_service import (
     VerifyVerifierSignaturesService,
 )
-# Try to import optimized version first
-try:
-    from bitvmx_protocol_library.transaction_generation.services.transaction_generator_from_public_keys_service_optimized import (
-        TransactionGeneratorFromPublicKeysServiceOptimized as TransactionGeneratorFromPublicKeysService,
-    )
-    print("[OPTIMIZED] Using optimized TransactionGeneratorFromPublicKeysService")
-except ImportError:
-    from bitvmx_protocol_library.transaction_generation.services.transaction_generator_from_public_keys_service import (
-        TransactionGeneratorFromPublicKeysService,
-    )
-    print("[WARNING] Using standard TransactionGeneratorFromPublicKeysService")
+# Use optimized version with UTXO fix
+from bitvmx_protocol_library.transaction_generation.services.transaction_generator_from_public_keys_service_optimized import (
+    TransactionGeneratorFromPublicKeysServiceOptimized as TransactionGeneratorFromPublicKeysService,
+)
+print("[OPTIMIZED] Using optimized TransactionGeneratorFromPublicKeysService with UTXO fix")
 from blockchain_query_services.services.blockchain_query_services_dependency_injection import (
     broadcast_transaction_service,
     faucet_service,

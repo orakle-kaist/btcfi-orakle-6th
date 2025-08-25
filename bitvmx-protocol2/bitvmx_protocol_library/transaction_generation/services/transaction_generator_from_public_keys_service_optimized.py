@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 import time
+import math
 
 from bitcoinutils.keys import P2wpkhAddress
 from bitcoinutils.transactions import Transaction, TxInput, TxOutput
@@ -14,6 +15,32 @@ from bitvmx_protocol_library.script_generation.services.bitvmx_bitcoin_scripts_g
 from bitvmx_protocol_library.transaction_generation.entities.dtos.bitvmx_transactions_dto import (
     BitVMXTransactionsDTO,
 )
+
+
+def estimate_vsize_from_hex(tx_hex: str) -> int:
+    """Estimate vsize from transaction hex (weight/4)"""
+    try:
+        b = bytes.fromhex(tx_hex)
+        # Check for segwit marker (0x00 0x01)
+        segwit = len(b) > 6 and b[4] == 0x00 and b[5] == 0x01
+        if segwit:
+            # Rough estimate: vsize = ceil(length * 0.75)
+            # More accurate would be to parse witness data
+            return math.ceil(len(b) * 0.75)
+        else:
+            return len(b)  # non-segwit: vsize = bytes
+    except:
+        return 150  # Safe fallback
+
+
+def check_min_fee(tx_hex: str, input_sum: int, output_sum: int, min_sat_vb: int = 3):
+    """Check if transaction meets minimum fee requirements"""
+    vsize = estimate_vsize_from_hex(tx_hex)
+    fee = input_sum - output_sum
+    need = vsize * min_sat_vb
+    print(f"[FEE] vsize≈{vsize}, fee={fee}, need≥{need} (at {min_sat_vb} sat/vB)")
+    assert fee >= need, f"Fee too low: {fee} < {need} (need {min_sat_vb} sat/vB for {vsize} vB)"
+    return True
 
 
 class TransactionGeneratorFromPublicKeysServiceOptimized:
@@ -54,12 +81,46 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
         start_time = time.time()
         print(f"[OPTIMIZED TX] Starting optimized transaction generation...")
         
+        # Helper function for consistent iteration handling
+        def _iter_range(iterations: int):
+            """Returns iteration range for 0-based indexing"""
+            it = 1 if iterations is None else int(iterations)
+            if it <= 1:
+                return [0]  # Single iteration with index 0
+            return range(it)  # 0..(iterations-1)
+        
         destroyed_public_key = bitvmx_protocol_setup_properties_dto.unspendable_public_key
         
-        # Pre-compute commonly used values
-        funding_amount = bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis
-        step_fees = bitvmx_protocol_setup_properties_dto.step_fees_satoshis
-        search_iterations = bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto.amount_of_wrong_step_search_iterations
+        # Immutable value extraction with protection
+        fa = int(bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis)
+        sf = int(bitvmx_protocol_setup_properties_dto.step_fees_satoshis)
+        print(f"[TXGEN] dto.funding={fa} dto.step_fee={sf}")
+        
+        # Minimum fee policy (sat/vB based)
+        MIN_STEP = 3000  # 최소 3000 satoshi 수수료 설정
+        if sf < MIN_STEP:
+            print(f"[TXGEN] step_fees {sf} < {MIN_STEP} → override to {MIN_STEP}")
+            sf = MIN_STEP
+        
+        # Use local variables only - never modify DTO
+        funding_amount = fa
+        step_fees = sf
+        print(f"[TXGEN] Final values: funding={funding_amount}, step_fees={step_fees}")
+        
+        # Normalize iterations (if empty, calculate from bits)
+        bits = getattr(
+            bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto,
+            "amount_of_bits_wrong_step_search",
+            1,
+        )
+        search_iterations = getattr(
+            bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto,
+            "amount_of_wrong_step_search_iterations",
+            0,
+        ) or (1 << int(bits))
+        
+        # Note: Cannot set iterations back to DTO due to pydantic constraints
+        # Just use the normalized value locally
         
         # Create funding transaction
         funding_txin = TxInput(
@@ -78,28 +139,35 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
         
         funding_tx = Transaction([funding_txin], [funding_txout], has_segwit=True)
         
+        # IMPORTANT: Use the actual funding_tx_id from setup, not the generated one
+        # The funding_tx above is just for reference, but we must use the real on-chain txid
+        actual_funding_txid = bitvmx_protocol_setup_properties_dto.funding_tx_id
+        actual_funding_index = bitvmx_protocol_setup_properties_dto.funding_index
+        
+        print(f"[OPTIMIZED TX] Using actual funding UTXO: {actual_funding_txid}:{actual_funding_index}")
+        
         # Pre-generate addresses in parallel
         print(f"[OPTIMIZED TX] Generating addresses in parallel...")
         hash_search_scripts_addresses = []
         choice_search_scripts_addresses = []
         
         with ThreadPoolExecutor(max_workers=4) as executor:
-            # Submit hash address generation
+            # Submit hash address generation using consistent iteration range
             hash_futures = [
                 executor.submit(
                     bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_search_scripts_list(i).get_taproot_address,
                     destroyed_public_key
                 )
-                for i in range(search_iterations)
+                for i in _iter_range(search_iterations)
             ]
             
-            # Submit choice address generation
+            # Submit choice address generation using consistent iteration range
             choice_futures = [
                 executor.submit(
                     bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_search_scripts_list(i).get_taproot_address,
                     destroyed_public_key
                 )
-                for i in range(search_iterations)
+                for i in _iter_range(search_iterations)
             ]
             
             # Collect results
@@ -116,8 +184,18 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
             public_key=destroyed_public_key
         )
         
-        hash_result_txin = TxInput(funding_tx.get_txid(), 0)
+        # Use the ACTUAL funding txid, not the generated one
+        hash_result_txin = TxInput(actual_funding_txid, actual_funding_index)
         hash_result_output_amount = funding_amount - step_fees
+        
+        # Fee verification logging
+        print(f"[TXGEN] Creating hash_result_tx:")
+        print(f"[TXGEN]   Input: {actual_funding_txid}:{actual_funding_index}")
+        print(f"[TXGEN]   Input amount: {funding_amount} satoshis")
+        print(f"[TXGEN]   Step fee: {step_fees} satoshis")
+        print(f"[TXGEN]   Output amount: {hash_result_output_amount} satoshis")
+        print(f"[TXGEN]   Transaction fee: {funding_amount - hash_result_output_amount} satoshis")
+        
         hash_result_txOut = TxOutput(
             hash_result_output_amount, trigger_protocol_script_address.to_script_pub_key()
         )
@@ -158,7 +236,8 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
             
             # CHOICE transaction
             current_output_amount -= step_fees
-            if i == search_iterations - 1:
+            # Check if this is the last iteration or we're out of hash addresses
+            if i == len(choice_search_scripts_addresses) - 1 or i + 1 >= len(hash_search_scripts_addresses):
                 next_address = trace_script_address
             else:
                 next_address = hash_search_scripts_addresses[i + 1]
@@ -278,6 +357,19 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
         
         print(f"[OPTIMIZED TX] Transaction generation completed in {time.time() - start_time:.2f}s")
         
+        # Final mutation check
+        assert int(bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis) == bitvmx_protocol_setup_properties_dto._original_funding, \
+            f"BUG: dto.funding_amount_of_satoshis mutated during generation ({bitvmx_protocol_setup_properties_dto._original_funding} → {bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis})"
+        assert int(bitvmx_protocol_setup_properties_dto.step_fees_satoshis) == bitvmx_protocol_setup_properties_dto._original_stepfee, \
+            f"BUG: dto.step_fees_satoshis mutated during generation ({bitvmx_protocol_setup_properties_dto._original_stepfee} → {bitvmx_protocol_setup_properties_dto.step_fees_satoshis})"
+        
+        # IMPORTANT: Include hash_result_tx and trigger_protocol_tx in broadcast list
+        # They must be broadcast BEFORE search transactions
+        read_search_hash_tx_list_with_parents = [hash_result_tx, trigger_protocol_tx] + search_hash_tx_list
+        read_search_choice_tx_list_with_parents = search_choice_tx_list  # These already depend on hash txs
+        
+        print(f"[OPTIMIZED TX] Including {len(read_search_hash_tx_list_with_parents)} hash txs and {len(read_search_choice_tx_list_with_parents)} choice txs for broadcast")
+        
         # Build and return the DTO
         return BitVMXTransactionsDTO(
             funding_tx=funding_tx,
@@ -291,8 +383,9 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
             trigger_wrong_program_counter_challenge_tx=trigger_wrong_pc_tx,
             trigger_equivocation_tx=trigger_equivocation_tx,
             execution_challenge_tx=execution_challenge_tx,
-            read_search_choice_tx_list=read_search_choice_tx_list,
-            read_search_hash_tx_list=read_search_hash_tx_list,
+            # Use the enhanced lists with parent transactions
+            read_search_hash_tx_list=read_search_hash_tx_list_with_parents,
+            read_search_choice_tx_list=read_search_choice_tx_list_with_parents,
             read_search_equivocation_tx_list=read_search_equivocation_tx_list,
             read_trace_tx=read_trace_tx,
             trigger_read_challenge_tx=trigger_read_challenge_tx,

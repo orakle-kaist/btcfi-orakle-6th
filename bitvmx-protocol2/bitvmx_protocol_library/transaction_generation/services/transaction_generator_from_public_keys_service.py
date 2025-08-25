@@ -22,6 +22,29 @@ class TransactionGeneratorFromPublicKeysService:
         self,
         bitvmx_protocol_setup_properties_dto: BitVMXProtocolSetupPropertiesDTO,
     ) -> BitVMXTransactionsDTO:
+        
+        # Helper function for consistent iteration handling (must be defined first)
+        def _iter_range(iterations: int):
+            """Returns iteration range that always starts from 1"""
+            it = 1 if iterations is None else int(iterations)
+            if it <= 1:
+                return [1]  # Minimum 1 iteration with iteration=1
+            return range(1, it)  # 1..(iterations-1)
+        
+        # Normalize iterations (if empty, calculate from bits)
+        bits = getattr(
+            bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto,
+            "amount_of_bits_wrong_step_search",
+            1,
+        )
+        iterations = getattr(
+            bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto,
+            "amount_of_wrong_step_search_iterations",
+            0,
+        ) or (1 << int(bits))
+        
+        # Note: Cannot set iterations back to DTO due to pydantic constraints
+        # Just use the normalized value locally
 
         destroyed_public_key = bitvmx_protocol_setup_properties_dto.unspendable_public_key
 
@@ -65,9 +88,8 @@ class TransactionGeneratorFromPublicKeysService:
         hash_result_tx = Transaction([hash_result_txin], [hash_result_txOut], has_segwit=True)
 
         hash_search_scripts_addresses = []
-        for i in range(
-            bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto.amount_of_wrong_step_search_iterations
-        ):
+        # Use same consistent iteration range for search scripts
+        for i in _iter_range(iterations):
             hash_search_scripts_addresses.append(
                 bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_search_scripts_list(
                     iteration=i
@@ -77,9 +99,7 @@ class TransactionGeneratorFromPublicKeysService:
             )
 
         choice_search_scripts_addresses = []
-        for i in range(
-            bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto.amount_of_wrong_step_search_iterations
-        ):
+        for i in _iter_range(iterations):
             choice_search_scripts_addresses.append(
                 bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_search_scripts_list(
                     iteration=i
@@ -109,7 +129,10 @@ class TransactionGeneratorFromPublicKeysService:
             destroyed_public_key
         )
 
-        for i in range(len(choice_search_scripts_addresses)):
+        # Ensure both lists have same length
+        num_iterations = min(len(choice_search_scripts_addresses), len(hash_search_scripts_addresses))
+        
+        for i in range(num_iterations):
 
             # HASH
             current_txin = TxInput(previous_tx_id, 0)
@@ -124,11 +147,8 @@ class TransactionGeneratorFromPublicKeysService:
             # CHOICE
             current_txin = TxInput(current_tx.get_txid(), 0)
             current_output_amount -= bitvmx_protocol_setup_properties_dto.step_fees_satoshis
-            if (
-                i
-                == bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto.amount_of_wrong_step_search_iterations
-                - 1
-            ):
+            # Check if this is the last iteration
+            if i == num_iterations - 1:
                 current_output_address = trace_script_address
             else:
                 current_output_address = hash_search_scripts_addresses[i + 1]
@@ -237,10 +257,9 @@ class TransactionGeneratorFromPublicKeysService:
         )
 
         hash_read_search_scripts_addresses = []
-        for i in range(
-            1,
-            bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto.amount_of_wrong_step_search_iterations,
-        ):
+        
+        # Use consistent iteration range
+        for i in _iter_range(iterations):
             hash_read_search_scripts_addresses.append(
                 bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_read_search_scripts_address(
                     destroyed_public_key=destroyed_public_key,
@@ -249,10 +268,7 @@ class TransactionGeneratorFromPublicKeysService:
             )
 
         choice_read_search_scripts_addresses = []
-        for i in range(
-            1,
-            bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto.amount_of_wrong_step_search_iterations,
-        ):
+        for i in _iter_range(iterations):
             choice_read_search_scripts_addresses.append(
                 bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_read_search_scripts_address(
                     destroyed_public_key=destroyed_public_key,

@@ -54,6 +54,18 @@ class BitVMXProtocolSetupPropertiesDTO(BaseModel):
                 **data["bitvmx_bitcoin_scripts_dto"]
             )
         super().__init__(**data)
+        
+        # Immutability protection: store original values
+        assert isinstance(self.funding_amount_of_satoshis, int) and self.funding_amount_of_satoshis > 0, \
+            f"Invalid funding_amount_of_satoshis: {self.funding_amount_of_satoshis}"
+        assert isinstance(self.step_fees_satoshis, int) and self.step_fees_satoshis > 0, \
+            f"Invalid step_fees_satoshis: {self.step_fees_satoshis}"
+        
+        # Store original values for mutation detection
+        self._original_funding = int(self.funding_amount_of_satoshis)
+        self._original_stepfee = int(self.step_fees_satoshis)
+        
+        print(f"[DTO INIT] funding={self._original_funding} sats, step_fee={self._original_stepfee} sats")
 
     @field_serializer("bitvmx_transactions_dto", when_used="always")
     def serialize_transactions_dto(

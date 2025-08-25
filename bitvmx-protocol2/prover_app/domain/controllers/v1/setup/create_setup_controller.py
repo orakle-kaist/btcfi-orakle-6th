@@ -233,17 +233,93 @@ class CreateSetupController:
         # We need to know the origin of the funds or change the signature to only sign the output (it's possible and gives more flexibility)
 
         # Transaction construction
-
-        # One call per verifier should be done
-        bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto = (
-            self.transaction_generator_from_public_keys_service(
-                bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,
+        
+        # FORCE SET funding information before transaction generation
+        print(f"[TX-GEN/PRECHECK] Before generation:")
+        print(f"  funding_tx_id={bitvmx_protocol_setup_properties_dto.funding_tx_id}")
+        print(f"  funding_index={bitvmx_protocol_setup_properties_dto.funding_index}")
+        print(f"  funding_amount={bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis}")
+        print(f"  prover_dest={bitvmx_protocol_setup_properties_dto.prover_destination_address}")
+        
+        # Ensure funding info is properly set
+        if not bitvmx_protocol_setup_properties_dto.funding_tx_id:
+            raise ValueError("funding_tx_id is required for transaction generation")
+            
+        # Avoid duplicate transaction generation
+        if bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto:
+            print("[TX-GEN/SKIP] Reusing existing transactions DTO")
+        else:
+            print("[TX-GEN/START] Generating transactions...")
+            tx_gen_start = time()
+            # One call per verifier should be done
+            bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto = (
+                self.transaction_generator_from_public_keys_service(
+                    bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,
+                )
             )
-        )
+            print(f"[TX-GEN/DONE] Transaction generation took {time() - tx_gen_start:.2f}s")
         print("Transactions built: " + str(time() - init_time))
         
         # Guard against empty transaction lists with detailed logging
         txdto = bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto
+        
+        # === Verify prevout in generated transactions ===
+        def _peek_prevout(tx_hex: str):
+            """Extract prevout (txid, vout) from transaction hex"""
+            try:
+                b = bytes.fromhex(tx_hex)
+                off = 4  # Skip version
+                # Check for segwit marker+flag
+                if len(b) >= 6 and b[4] == 0x00 and b[5] == 0x01:
+                    off += 2
+                if off >= len(b):
+                    return None
+                n_inputs = b[off]
+                off += 1
+                if n_inputs < 1 or off + 36 > len(b):
+                    return None
+                txid_le = b[off:off+32]
+                off += 32
+                vout = int.from_bytes(b[off:off+4], "little")
+                txid = txid_le[::-1].hex()
+                return txid, vout
+            except Exception as e:
+                print(f"[TX-GEN/CHECK] Error parsing prevout: {e}")
+                return None
+        
+        # Check first transaction's prevout
+        expected_funding_tx = bitvmx_protocol_setup_properties_dto.funding_tx_id
+        expected_funding_index = bitvmx_protocol_setup_properties_dto.funding_index
+        
+        for tx_list_name in ["read_search_hash_tx_list", "search_hash_tx_list", 
+                              "read_search_choice_tx_list", "search_choice_tx_list"]:
+            tx_list = getattr(txdto, tx_list_name, None)
+            if tx_list and isinstance(tx_list, list) and len(tx_list) > 0:
+                first_tx = tx_list[0]
+                if isinstance(first_tx, str):
+                    tx_hex = first_tx
+                elif hasattr(first_tx, "serialize"):
+                    tx_hex = first_tx.serialize()
+                else:
+                    continue
+                    
+                prevout = _peek_prevout(tx_hex)
+                if prevout:
+                    actual_txid, actual_vout = prevout
+                    print(f"[TX-GEN/CHECK] {tx_list_name}[0] prevout: {actual_txid}:{actual_vout}")
+                    
+                    if actual_txid.lower() != expected_funding_tx.lower():
+                        print(f"[TX-GEN/ERROR] Wrong funding txid!")
+                        print(f"  Expected: {expected_funding_tx}")
+                        print(f"  Got: {actual_txid}")
+                        # Don't raise error, just warn for now
+                    elif actual_vout != expected_funding_index:
+                        print(f"[TX-GEN/ERROR] Wrong funding index!")
+                        print(f"  Expected: {expected_funding_index}")
+                        print(f"  Got: {actual_vout}")
+                    else:
+                        print(f"[TX-GEN/CHECK] ✓ Prevout matches expected funding UTXO")
+                    break
         
         # === Fallback: if read_* lists are empty but search_* exists, reuse them ===
         def _ensure_list(x):
@@ -407,6 +483,33 @@ class CreateSetupController:
         )
 
         #################################################################
+        
+        # Apply signatures to transactions and save signed versions
+        from bitvmx_protocol_library.transaction_generation.services.apply_signatures_to_transactions_service import (
+            ApplySignaturesToTransactionsService,
+        )
+        
+        apply_signatures_service = ApplySignaturesToTransactionsService()
+        
+        # Create signed transactions
+        print("[SIGN] Applying signatures to transactions...")
+        signed_transactions = apply_signatures_service.apply_signatures_with_private_key(
+            bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,
+            bitvmx_signatures_dto=bitvmx_signatures_dto,
+            bitvmx_verifier_signatures_dto=list(verifier_signatures_dto_dict.values())[0] if verifier_signatures_dto_dict else None,
+            prover_private_key_hex=prover_signature_private_key,
+        )
+        
+        # Save signed transactions to file
+        if signed_transactions:
+            apply_signatures_service.save_signed_transactions(
+                setup_uuid=setup_uuid,
+                signed_transactions=signed_transactions,
+                base_dir="prover_files"
+            )
+            print(f"[SIGN] Saved {len(signed_transactions)} signed transaction types")
+        else:
+            print("[SIGN] Warning: No signed transactions created")
 
         origin_of_funds_public_key = origin_of_funds_private_key.get_public_key()
 

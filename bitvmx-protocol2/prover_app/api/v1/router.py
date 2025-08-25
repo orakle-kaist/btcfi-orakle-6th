@@ -4,7 +4,7 @@ from fastapi import APIRouter, Body
 
 from prover_app.api.v1.fund.crud.v1.view_models.post import FundPostV1Input, FundPostV1Output
 from prover_app.api.v1.input.crud.v1.view_models.post import InputPostV1Input, InputPostV1Output
-from prover_app.api.v1.next_step.crud.v1.view_models.post import NextStepPostV1Input
+from prover_app.api.v1.next_step.crud.view_models.post import NextStepPostV1Input, NextStepPostV1Output
 from prover_app.api.v1.setup.crud.v1.swagger_examples.post import (
     setup_post_v1_input_swagger_examples,
 )
@@ -46,8 +46,42 @@ async def setup_fund_post(
 
 @router.post("/next_step")
 async def next_step_post(next_step_post_input: NextStepPostV1Input = Body()):
-    view_controller = NextStepPostViewControllers.v1()
-    return await view_controller(next_step_post_view_input=next_step_post_input)
+    # Import broadcast service
+    from prover_app.domain.services.broadcast_protocol_service import broadcast_protocol_transactions
+    
+    # Get the same persistence and broadcast service used by setup controller
+    # Import from the same dependency injection used by setup
+    from prover_app.dependency_injection.domain.create_setup import CreateSetupControllers
+    
+    # Get controller instance to access services
+    setup_controller = CreateSetupControllers.bitvmx_protocol()
+    
+    try:
+        # Broadcast protocol transactions
+        result = broadcast_protocol_transactions(
+            setup_uuid=next_step_post_input.setup_uuid,
+            persistence=setup_controller.bitvmx_protocol_setup_properties_dto_persistence,
+            broadcast_service=setup_controller.broadcast_transaction_service,
+        )
+        
+        # Return success with broadcast results
+        return NextStepPostV1Output(
+            message=f"Broadcasted {result['broadcasted_count']} tx(s), skipped {result['skipped_count']}, failed {result['failed_count']} for {result['setup_uuid']}",
+            next_step="await_confirmations" if result['broadcasted_count'] > 0 else "check_failed_transactions"
+        )
+        
+    except ValueError as e:
+        # Setup not found or no transactions
+        return NextStepPostV1Output(
+            message=str(e),
+            next_step="error"
+        )
+    except Exception as e:
+        # Other errors
+        return NextStepPostV1Output(
+            message=f"Error broadcasting transactions: {str(e)}",
+            next_step="error"
+        )
 
 
 @router.post("/fund")

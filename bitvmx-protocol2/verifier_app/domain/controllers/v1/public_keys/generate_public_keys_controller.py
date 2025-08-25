@@ -122,12 +122,17 @@ class GeneratePublicKeysController:
         
         # Transaction generation is required for signature generation
         t2 = time()
-        bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto = (
-            self.transaction_generator_from_public_keys_service(
-                bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,
+        # Avoid duplicate transaction generation
+        if bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto:
+            print("[VERIFIER/TX-GEN/SKIP] Reusing existing transactions DTO")
+        else:
+            print("[VERIFIER/TX-GEN/START] Generating transactions...")
+            bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto = (
+                self.transaction_generator_from_public_keys_service(
+                    bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,
+                )
             )
-        )
-        print(f"[TIMING] Transaction generation took: {time() - t2:.2f}s")
+            print(f"[VERIFIER/TX-GEN/DONE] Transaction generation took: {time() - t2:.2f}s")
         print("Call create protocol setup properties time: " + str(time() - init_time))
         self.bitvmx_protocol_setup_properties_dto_persistence.create(
             bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto
