@@ -86,13 +86,34 @@ class CreateSetupController:
         prover_destination_address: str,
         prover_signature_private_key: str,
         prover_signature_public_key: str,
+        funding_private_key: str = None,
     ) -> str:
         setup_uuid = str(uuid.uuid4())
         prover_uuid = str(uuid.uuid4())
         init_time = time()
 
-        funding_tx = self.transaction_info_service(tx_id=funding_tx_id)
-        initial_amount_of_satoshis = funding_tx.outputs[funding_index].value - step_fees_satoshis
+        # Check if funding_tx_id is all zeros (meaning we'll generate our own funding tx)
+        using_existing_utxo = funding_tx_id != "0" * 64
+        if not using_existing_utxo:
+            print("[SETUP] Using self-generated funding transaction")
+            # Get initial amount from environment config
+            initial_amount_of_satoshis = common_protocol_properties.initial_amount_satoshis
+            print(f"[SETUP] Using initial amount: {initial_amount_of_satoshis} satoshis")
+            funding_tx = None  # Will be generated later
+        else:
+            print(f"[SETUP] Using existing UTXO: {funding_tx_id}:{funding_index}")
+            funding_tx = self.transaction_info_service(tx_id=funding_tx_id)
+            
+            # DTO 일관성 검증 - CRITICAL CHECK
+            if funding_index >= len(funding_tx.outputs):
+                raise Exception(f"[CRITICAL] Invalid funding_index {funding_index}. Transaction only has {len(funding_tx.outputs)} outputs")
+            
+            actual_output = funding_tx.outputs[funding_index]
+            print(f"[TX-GEN/PRECHECK] DTO specified: funding_tx_id={funding_tx_id}, index={funding_index}")
+            print(f"[TX-GEN/PRECHECK] Chain actual: value={actual_output.value} sats")
+            
+            initial_amount_of_satoshis = actual_output.value - step_fees_satoshis
+            print(f"[TX-GEN/PRECHECK] Initial amount after fees: {initial_amount_of_satoshis} satoshis")
         bitvmx_protocol_properties_dto = BitVMXProtocolPropertiesDTO(
             max_amount_of_steps=max_amount_of_steps,
             amount_of_input_words=amount_of_input_words,
@@ -168,6 +189,7 @@ class CreateSetupController:
             step_fees_satoshis=step_fees_satoshis,
             funding_tx_id=funding_tx_id,
             funding_index=funding_index,
+            funding_private_key=funding_private_key,
             verifier_address_dict=verifier_address_dict,
             prover_destination_address=prover_destination_address,
             prover_signature_public_key=prover_signature_public_key,
@@ -188,8 +210,14 @@ class CreateSetupController:
             # verifier_value already contains /api/v1 from verifier_list
             url = f"{verifier_value}/public_keys"
             headers = {"accept": "application/json", "Content-Type": "application/json"}
+            # Debug: Check signature public keys
+            dto_dict = bitvmx_protocol_setup_properties_dto.dict()
+            print(f"[DEBUG] Sending to verifier:")
+            print(f"  - prover_signature_public_key: {dto_dict.get('prover_signature_public_key', 'NOT FOUND')}")
+            print(f"  - verifier_signature_public_key: {dto_dict.get('verifier_signature_public_key', 'NOT FOUND')}")
+            
             data = {
-                "bitvmx_protocol_setup_properties_dto": bitvmx_protocol_setup_properties_dto.dict(),
+                "bitvmx_protocol_setup_properties_dto": dto_dict,
             }
 
             # Increase timeout to 600 seconds for public_keys endpoint (heavy computation)
@@ -513,26 +541,152 @@ class CreateSetupController:
 
         origin_of_funds_public_key = origin_of_funds_private_key.get_public_key()
 
-        funding_sig = origin_of_funds_private_key.sign_segwit_input(
-            bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx,
-            0,
-            origin_of_funds_public_key.get_address().to_script_pub_key(),
-            initial_amount_of_satoshis + step_fees_satoshis,
-        )
+        # Check the type of the funding UTXO and sign appropriately
+        if using_existing_utxo:
+            # For existing UTXO, check its type and sign accordingly
+            # Check if we have funding_private_key (for P2WPKH)
+            if funding_private_key:
+                print(f"[SIGN] Signing funding_tx for P2WPKH UTXO using provided private key")
+                
+                # Use the provided funding private key
+                from bitcoinutils.script import Script
+                import hashlib
+                
+                # Convert hex private key to PrivateKey object
+                funding_priv = PrivateKey(secret_exponent=int(funding_private_key, 16))
+                funding_pub = funding_priv.get_public_key()
+                
+                # Ensure we have compressed public key (33 bytes, starting with 02 or 03)
+                pub_hex = funding_pub.to_hex()
+                print(f"[SIGN] Public key: {pub_hex}")
+                print(f"[SIGN] Public key length: {len(pub_hex)} chars (should be 66 for compressed)")
+                
+                # For P2WPKH, we need the P2PKH script for signing
+                pubkey_bytes = bytes.fromhex(pub_hex)
+                pkh = hashlib.new('ripemd160', hashlib.sha256(pubkey_bytes).digest()).digest()
+                script_code = Script(['OP_DUP', 'OP_HASH160', pkh.hex(), 'OP_EQUALVERIFY', 'OP_CHECKSIG'])
+                
+                # Get the actual amount from the funding UTXO
+                prevout_amount = initial_amount_of_satoshis  # Use the actual UTXO amount
+                
+                # Sign using P2WPKH
+                funding_sig = funding_priv.sign_segwit_input(
+                    bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx,
+                    0,
+                    script_code,
+                    prevout_amount
+                )
+                
+                # For P2WPKH, witness is [signature, pubkey]
+                bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx.witnesses.append(
+                    TxWitnessInput([funding_sig, pub_hex])
+                )
+                print(f"[SIGN] Added P2WPKH witness for funding_tx with compressed pubkey")
+            else:
+                # Original Taproot code (kept for compatibility)
+                print(f"[SIGN] Signing funding_tx for existing Taproot UTXO")
+                
+                from bitcoinutils.script import Script
+                # The actual scriptPubKey from the blockchain
+                prevout_script_hex = "51207439ce6516333ae380ad54eba04be631888035fcb1f5473207b115db9c845a2f"
+                prevout_script = Script.from_raw(prevout_script_hex)
+                prevout_amount = 9997000  # The actual amount in the UTXO
+                
+                # Sign using Taproot key-path (not script-path)
+                funding_sig = origin_of_funds_private_key.sign_taproot_input(
+                    bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx,
+                    0,
+                    [prevout_script],  # List of prevout scripts
+                    [prevout_amount],  # List of prevout amounts
+                    script_path=False  # Key-path spending for the external UTXO
+                )
+                
+                # For Taproot key-path, witness is just the signature
+                bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx.witnesses.append(
+                    TxWitnessInput([funding_sig])
+                )
+                print(f"[SIGN] Added Taproot key-path witness for funding_tx")
+        else:
+            # For self-generated funding_tx with P2WPKH
+            funding_sig = origin_of_funds_private_key.sign_segwit_input(
+                bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx,
+                0,
+                origin_of_funds_public_key.get_address().to_script_pub_key(),
+                initial_amount_of_satoshis + step_fees_satoshis,
+            )
 
-        bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx.witnesses.append(
-            TxWitnessInput([funding_sig, origin_of_funds_public_key.to_hex()])
-        )
+            bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx.witnesses.append(
+                TxWitnessInput([funding_sig, origin_of_funds_public_key.to_hex()])
+            )
 
-        # Skip broadcasting funding_tx as it's already on-chain
-        print("[BROADCAST] Skipping funding_tx broadcast (already on-chain)")
-        print(
-            "Funding transaction ID: "
-            + bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx.get_txid()
-        )
+        # ALWAYS broadcast funding_tx - it moves funds to hash_result Taproot address
+        # CRITICAL: Broadcast funding_tx to create the parent UTXO for hash_result_tx
+        if using_existing_utxo:
+            print("[BROADCAST] Broadcasting funding_tx to move external UTXO to hash_result Taproot address...")
+        else:
+            print("[BROADCAST] Broadcasting self-generated funding_tx to create parent UTXO...")
         
-        # Only broadcast new protocol transactions, not the funding tx
-        # self.broadcast_transaction_service(
-        #     transaction=bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx.serialize()
-        # )
+        # Get funding tx ID before broadcast
+        funding_txid = bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx.get_txid()
+        print(f"[BROADCAST] Funding transaction ID: {funding_txid}")
+        
+        # Actually broadcast the funding_tx - THIS IS CRITICAL!
+        try:
+            # Use segwit-safe serialization to ensure witness is included
+            funding_tx_hex = bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.funding_tx.to_bytes(has_segwit=True).hex()
+            self.broadcast_transaction_service(
+                transaction=funding_tx_hex
+            )
+            print(f"[BROADCAST] Successfully broadcasted funding_tx: {funding_txid}")
+            
+            # CRITICAL: Update DTO with generated funding_tx info for proper chain reference
+            bitvmx_protocol_setup_properties_dto.funding_tx_id = funding_txid
+            bitvmx_protocol_setup_properties_dto.funding_index = 0
+            print(f"[BROADCAST] Updated DTO with generated funding_tx_id: {funding_txid}, index: 0")
+            
+            # CRITICAL: Persist the updated DTO so next_step can see the changes!
+            self.bitvmx_protocol_setup_properties_dto_persistence.update(
+                bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto
+            )
+            print(f"[BROADCAST] Persisted DTO update with funding_tx_id: {funding_txid}")
+            
+            # Wait for funding_tx to propagate
+            import httpx
+            max_retries = 8
+            retry_delay = 5
+            funding_confirmed = False
+            
+            print(f"[BROADCAST] Waiting for funding_tx {funding_txid} to propagate...")
+            for retry in range(max_retries):
+                import time as time_module
+                time_module.sleep(retry_delay)
+                try:
+                    check_url = f"https://mutinynet.com/api/tx/{funding_txid}"
+                    with httpx.Client(timeout=10) as client:
+                        response = client.get(check_url)
+                        if response.status_code == 200:
+                            print(f"[BROADCAST] Funding_tx confirmed in mempool after {retry+1} retries")
+                            funding_confirmed = True
+                            break
+                        else:
+                            print(f"[BROADCAST] Funding_tx not yet in mempool, retry {retry+1}/{max_retries}")
+                except Exception as e:
+                    print(f"[BROADCAST] Error checking funding_tx: {e}")
+            
+            if not funding_confirmed:
+                print(f"[BROADCAST] WARNING: Funding_tx not confirmed after {max_retries} retries")
+                print("[BROADCAST] You may need to wait and call /next_step later")
+                
+        except Exception as e:
+            error_msg = str(e)
+            # Check if already in blockchain
+            if any(phrase in error_msg.lower() for phrase in [
+                "already in block chain",
+                "txn-already-in-mempool",
+                "already have transaction"
+            ]):
+                print(f"[BROADCAST] Funding_tx already on-chain: {funding_txid}")
+            else:
+                print(f"[BROADCAST] Error broadcasting funding_tx: {e}")
+                raise
         return setup_uuid

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  prover-backend:
+    environment:
+      - RUST_LOG=error
+      - RUST_BACKTRACE=0
+      - UVICORN_LOG_LEVEL=warning
+      - PYTHONUNBUFFERED=1
+  
+  verifier-backend:
+    environment:
+      - RUST_LOG=error
+      - RUST_BACKTRACE=0
+      - UVICORN_LOG_LEVEL=warning
+      - PYTHONUNBUFFERED=1

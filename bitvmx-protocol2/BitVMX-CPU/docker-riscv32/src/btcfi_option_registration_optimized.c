@@ -35,6 +35,7 @@ void* memset(void* s, int c, unsigned long n) {
 #define INPUT_ADDRESS 0x80000000
 #define OUTPUT_ADDRESS 0x80001000
 
+
 // Manual 64-bit division for bare metal
 uint64_t __udivdi3(uint64_t dividend, uint64_t divisor) {
     if (divisor == 0) return 0;
