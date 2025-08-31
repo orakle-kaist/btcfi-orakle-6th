@@ -41,7 +41,7 @@ async def setup_fund_post(
     ]
 ):
     view_controller = SetupFundPostViewControllers.v1()
-    return await view_controller(setup_post_view_input=setup_fund_post_input)
+    return await view_controller(setup_fund_post_view_input=setup_fund_post_input)
 
 
 @router.post("/next_step")
@@ -57,12 +57,62 @@ async def next_step_post(next_step_post_input: NextStepPostV1Input = Body()):
     setup_controller = CreateSetupControllers.bitvmx_protocol()
     
     try:
+        # Check if we need to regenerate transactions
+        if next_step_post_input.regen_transactions:
+            print(f"[NEXT_STEP] Regenerating transactions for setup {next_step_post_input.setup_uuid}")
+            
+            # Get the DTO
+            dto = setup_controller.bitvmx_protocol_setup_properties_dto_persistence.get(
+                setup_uuid=next_step_post_input.setup_uuid
+            )
+            
+            if not dto:
+                return NextStepPostV1Output(
+                    message=f"Setup {next_step_post_input.setup_uuid} not found",
+                    next_step="error"
+                )
+            
+            # Import transaction generator service
+            from bitvmx_protocol_library.transaction_generation.services.transaction_generator_from_public_keys_service import (
+                TransactionGeneratorFromPublicKeysService,
+            )
+            
+            # Create transaction generator
+            tx_generator = TransactionGeneratorFromPublicKeysService()
+            
+            # Regenerate transactions using current funding_tx_id and funding_index
+            print(f"[NEXT_STEP] Using funding_tx_id: {dto.funding_tx_id}, index: {dto.funding_index}")
+            
+            # The generator expects the full DTO as parameter
+            dto.bitvmx_transactions_dto = tx_generator(
+                bitvmx_protocol_setup_properties_dto=dto
+            )
+            
+            # Save updated DTO
+            if setup_controller.bitvmx_protocol_setup_properties_dto_persistence.update(dto):
+                print(f"[NEXT_STEP] Successfully regenerated and saved transactions")
+                # Force re-signing since we have new transactions
+                next_step_post_input.force_resign = True
+            else:
+                return NextStepPostV1Output(
+                    message=f"Failed to save regenerated transactions for {next_step_post_input.setup_uuid}",
+                    next_step="error"
+                )
+        
         # Broadcast protocol transactions
         result = broadcast_protocol_transactions(
             setup_uuid=next_step_post_input.setup_uuid,
             persistence=setup_controller.bitvmx_protocol_setup_properties_dto_persistence,
             broadcast_service=setup_controller.broadcast_transaction_service,
+            force_resign=next_step_post_input.force_resign if hasattr(next_step_post_input, 'force_resign') else False,
         )
+        
+        # Check for specific error conditions
+        if isinstance(result, dict) and result.get('error') == 'funding_tx_missing':
+            return NextStepPostV1Output(
+                message=result.get('message', 'Funding transaction missing'),
+                next_step="needs_regeneration"
+            )
         
         # Return success with broadcast results
         return NextStepPostV1Output(

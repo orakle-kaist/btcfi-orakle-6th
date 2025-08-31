@@ -1,4 +1,5 @@
 """
+from prover_app.common.hexsafe import bfromhex_safe
 BitVMX 옵션 통합 모듈
 기존 BitVMX 구조를 활용하여 옵션 기능 구현
 """
@@ -56,7 +57,7 @@ class BitVMXOptionIntegration:
         Returns:
             파싱된 옵션 파라미터
         """
-        data = bytes.fromhex(input_hex)
+        data = bfromhex_safe(input_hex)
         opt_type, strike_cents, spot_cents, quantity_units = struct.unpack('<IIII', data)
         
         return {

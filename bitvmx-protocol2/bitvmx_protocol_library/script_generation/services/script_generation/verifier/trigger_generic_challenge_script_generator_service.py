@@ -38,7 +38,7 @@ class TriggerGenericChallengeScriptGeneratorService:
 
         for signature_public_key in reversed(signature_public_keys):
             script.extend(
-                [PublicKey(hex_str=signature_public_key).to_x_only_hex(), "OP_CHECKSIGVERIFY"]
+                [PublicKey(signature_public_key).to_x_only_hex(), "OP_CHECKSIGVERIFY"]
             )
 
         script.append(1)

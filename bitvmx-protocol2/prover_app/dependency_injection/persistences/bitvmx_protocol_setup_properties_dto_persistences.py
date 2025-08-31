@@ -7,7 +7,7 @@ from prover_app.persistence.json.bitvmx_protocol_setup_properties_dto_json_persi
 
 class BitVMXProtocolSetupPropertiesDTOPersistences:
     json = providers.Singleton(
-        BitVMXProtocolSetupPropertiesDTOJsonPersistence, base_path="verifier_files"
+        BitVMXProtocolSetupPropertiesDTOJsonPersistence, base_path="prover_files"
     )
 
     bitvmx = json

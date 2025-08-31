@@ -1,0 +1,19 @@
+{
+  "product_data": {
+    "product_id": "BTCOPT_1756188003",
+    "name": "BTC Call Option Feb 2025",
+    "type": "CALL",
+    "strike_price": 65000,
+    "expiry": "2025-02-01T00:00:00Z",
+    "pool_size": 10.0,
+    "min_purchase": 0.001,
+    "max_purchase": 1.0,
+    "created_at": 1756188003,
+    "creator": "tb1qt8rdur557nz338g3lekc6458pj0dl63c0s9904"
+  },
+  "commitment": {
+    "full": "d8e4daa0105795d262c3756510206e40af6289157b0ce62d867868ef238d6f76",
+    "onchain": "d8e4daa0"
+  },
+  "created_at": 1756188003.4695308
+}

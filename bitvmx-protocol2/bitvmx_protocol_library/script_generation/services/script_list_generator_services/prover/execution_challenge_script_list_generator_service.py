@@ -148,7 +148,7 @@ class ExecutionChallengeScriptListGeneratorService:
             bits_per_digit_checksum=bits_per_digit_checksum,
         )
 
-        # test_public_key = PublicKey(hex_str=signature_public_keys[0])
+        # test_public_key = PublicKey(signature_public_keys[0])
         # assert (
         #     bitcoin_script_list.get_taproot_address(test_public_key).to_string()
         #     == bitvmx_execution_script_list.get_taproot_address(test_public_key).to_string()

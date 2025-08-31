@@ -21,6 +21,7 @@ class SetupPostV1Input(BaseModel):
     funding_tx_id: Optional[str] = None
     funding_index: Optional[int] = None
     funding_amount_of_satoshis: Optional[int] = None
+    funding_private_key: Optional[str] = None
     secret_origin_of_funds: Optional[str] = None
     prover_destination_address: Optional[str] = None
     prover_signature_private_key: Optional[str] = None

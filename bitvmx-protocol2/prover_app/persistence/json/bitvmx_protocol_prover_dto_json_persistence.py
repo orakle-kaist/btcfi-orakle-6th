@@ -13,7 +13,8 @@ class BitVMXProtocolProverDTOJsonPersistence(BitVMXProtocolProverDTOPersistenceI
 
     def __init__(self, base_path: str):
         self.base_path = base_path
-        self.file_name = "bitvmx_protocol_verifier_dto.json"
+        self.file_name = "bitvmx_protocol_prover_dto.json"
+        self.old_file_name = "bitvmx_protocol_verifier_dto.json"  # For migration
 
     def create(
         self,
@@ -29,6 +30,12 @@ class BitVMXProtocolProverDTOJsonPersistence(BitVMXProtocolProverDTOPersistenceI
 
     def get(self, setup_uuid: str) -> BitVMXProtocolProverDTO:
         file_path = f"{self.base_path}/{setup_uuid}/{self.file_name}"
+        old_file_path = f"{self.base_path}/{setup_uuid}/{self.old_file_name}"
+        
+        # Migration: if old file exists but new doesn't, rename it
+        if not os.path.exists(file_path) and os.path.exists(old_file_path):
+            os.rename(old_file_path, file_path)
+        
         with open(file_path, "r") as file:
             json_data = json.load(file)
         return BitVMXProtocolProverDTO(**json_data)
@@ -36,7 +43,7 @@ class BitVMXProtocolProverDTOJsonPersistence(BitVMXProtocolProverDTOPersistenceI
     def update(self, setup_uuid: str, bitvmx_protocol_prover_dto: BitVMXProtocolProverDTO) -> bool:
         file_path = f"{self.base_path}/{setup_uuid}/{self.file_name}"
         if not os.path.exists(file_path):
-            raise Exception(f"BitVMXProtocolVerifierDTO not found for id {setup_uuid}")
+            raise Exception(f"BitVMXProtocolProverDTO not found for id {setup_uuid}")
         with open(file_path, "w") as file:
             json.dump(bitvmx_protocol_prover_dto.model_dump(), file)
         return True

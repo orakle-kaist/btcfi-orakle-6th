@@ -10,3 +10,4 @@ class NextStepPostViewControllerV1:
         
     async def __call__(self, next_step_post_input: NextStepPostV1Input) -> NextStepPostV1Output:
         return await self.next_step_controller(setup_uuid=next_step_post_input.setup_id)
+    

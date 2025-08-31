@@ -1,0 +1,10 @@
+{
+  "registration_txid": "a3809568928cb3c74b7baccf74e77a30b932506d38292089368079414c04601e",
+  "option_type": "PUT",
+  "strike_price": 50000,
+  "spot_price": 54000,
+  "quantity": 100,
+  "status": "REGISTERED",
+  "setup_uuid": "3f1cf356-970f-4c86-962a-172fff381661",
+  "funding_spent": "539791219d09dae66fdf14e3acb9f5293104d8ae37cb9b3e9ce32b4982765400:0"
+}

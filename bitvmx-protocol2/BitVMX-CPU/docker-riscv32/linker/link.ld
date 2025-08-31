@@ -28,6 +28,16 @@ SECTIONS
         . = ALIGN(4);
     }
     
+    .output 0xAB000000 : ALIGN(4) {
+        *(.output)
+        . = ALIGN(4);
+    }
+    
+    .noinit 0xE0800000 (NOLOAD) : ALIGN(4) {
+        *(.noinit)
+        . = ALIGN(4);
+    }
+    
     .registers 0xF0000000 : ALIGN(4) {
         *(.registers)
         . = ALIGN(4);

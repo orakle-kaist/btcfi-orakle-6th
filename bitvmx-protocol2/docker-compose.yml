@@ -5,9 +5,11 @@ services:
      - .env_common
      - .env_prover
     environment:
-      - HASH_FEES_SATOSHIS=1000
+      - STEP_FEES_SATOSHIS=3000
+      - HASH_FEES_SATOSHIS=3000
       - CHOICE_FEES_SATOSHIS=1000
-      - TRIGGER_FEES_SATOSHIS=2000
+      - TRIGGER_FEES_SATOSHIS=3000
+      - INITIAL_AMOUNT_SATOSHIS=100000
     volumes:
       - type: bind
         source: .
@@ -15,7 +17,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8081:80"
+      - "8080:80"
     networks:
       - bitvmx-net
 
@@ -31,7 +33,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8080:80"
+      - "8081:80"
     networks:
       - bitvmx-net
 

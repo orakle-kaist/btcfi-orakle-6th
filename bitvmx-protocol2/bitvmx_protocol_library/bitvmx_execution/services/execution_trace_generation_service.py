@@ -11,14 +11,14 @@ class ExecutionTraceGenerationService:
         옵션 타입에 따라 적절한 ELF 파일 반환
         """
         if option_type == "registration":
-            return "option_registration.elf"
+            return "option_registration_final.elf"  # BitVMX 정석대로 만든 ELF
         elif option_type == "purchase":
             return "option_purchase.elf"
         elif option_type == "settlement":
             return "option_settlement.elf"
         else:
             # 기본값
-            return "test_input.elf"
+            return "option_settlement.elf"
 
     # This can be computed on the fly to avoid storing it (it does not take that much time to generate it)
     @staticmethod
@@ -32,6 +32,9 @@ class ExecutionTraceGenerationService:
             return "./execution_files/instruction_commitment.txt"
         elif elf_file_name == "test_input.elf":
             return "./execution_files/instruction_commitment_input.txt"
+        elif elf_file_name.startswith("btcfi_"):
+            # BTCFi 관련 ELF 파일들은 btcfi commitment 사용
+            return "./execution_files/btcfi_instruction_commitment.txt"
         elif elf_file_name.startswith("option_"):
             # 옵션 관련 ELF 파일들은 공통 commitment 사용
             return "./execution_files/instruction_commitment.txt"

@@ -24,9 +24,22 @@ class TriggerWrongReadTraceStepScriptGeneratorService:
     ):
         script = BitcoinScript()
         for signature_public_key in signature_public_keys:
+            # Handle both string and PublicKey object types
+            if isinstance(signature_public_key, str):
+                if not signature_public_key or len(signature_public_key) < 66:
+                    print(f"[ERROR] Invalid signature_public_key in read_trace: '{signature_public_key}' (length: {len(signature_public_key) if signature_public_key else 0})")
+                    continue
+                try:
+                    public_key_obj = PublicKey.from_hex(signature_public_key)
+                except Exception as e:
+                    print(f"[ERROR] Failed to parse public key in read_trace '{signature_public_key}': {e}")
+                    continue
+            else:
+                public_key_obj = signature_public_key
+            
             script.extend(
                 [
-                    PublicKey(hex_str=signature_public_key).to_x_only_hex(),
+                    public_key_obj.to_x_only_hex(),
                     "OP_CHECKSIGVERIFY",
                 ]
             )

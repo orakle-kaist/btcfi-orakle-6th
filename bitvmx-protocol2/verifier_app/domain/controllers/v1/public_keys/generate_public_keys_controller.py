@@ -95,6 +95,11 @@ class GeneratePublicKeysController:
             bitvmx_protocol_properties_dto=bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto
         )
         print("Call generate scripts: " + str(time() - init_time))
+        
+        # Debug: Check signature public keys
+        print(f"[VERIFIER DEBUG] prover_signature_public_key: {bitvmx_protocol_setup_properties_dto.prover_signature_public_key}")
+        print(f"[VERIFIER DEBUG] verifier_signature_public_key: {bitvmx_protocol_setup_properties_dto.verifier_signature_public_key}")
+        
         t0 = time()
         bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto = (
             self.bitvmx_bitcoin_scripts_generator_service(

@@ -1,0 +1,27 @@
+{
+  "setup_uuid": "5d85032d-c324-457b-af57-95e58a3ede1a",
+  "network": "mutinynet",
+  "name": "BTCFi Option Registration with Taproot",
+  "max_amount_of_steps": 50000,
+  "amount_of_bits_wrong_step_search": 1,
+  "funding_tx_id": "83b49b175eacb5856c8433bb95a9a110276500191990166490cbc7967d152b67",
+  "funding_index": 0,
+  "funding_amount_of_satoshis": 369989867,
+  "secret_origin_of_funds": "74516cab24ab8e3bea8274dbf19d7a66661da91a419ba51a85ef7c7b8b0968d8",
+  "prover_destination_address": "tb1qt8rdur557nz338g3lekc6458pj0dl63c0s9904",
+  "prover_signature_private_key": "74516cab24ab8e3bea8274dbf19d7a66661da91a419ba51a85ef7c7b8b0968d8",
+  "prover_signature_public_key": "03c972bf0c12746ef876f2b3ba81bab3cc25774bed7ad551a5c3768c324dafa179",
+  "verifier_signature_private_key": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "verifier_signature_public_key": "0366666666666666666666666666666666666666666666666666666666666666",
+  "amount_of_input_words": 4,
+  "step_fees_satoshis": 3000,
+  "max_fee_allowed": 100000,
+  "amount_of_public_inputs": 1,
+  "list_of_public_inputs": [
+    "056b8ed2"
+  ],
+  "verifier_list": [],
+  "prover_publishing_transaction_id": null,
+  "rom_commitment_file": "execution_files/instruction_commitment_option_registration.txt",
+  "elf_file": "execution_files/btcfi_option_registration_v2.elf"
+}

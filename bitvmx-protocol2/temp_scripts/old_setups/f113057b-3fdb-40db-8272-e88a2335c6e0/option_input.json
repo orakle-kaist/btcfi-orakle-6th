@@ -1,0 +1,10 @@
+{
+  "setup_uuid": "f113057b-3fdb-40db-8272-e88a2335c6e0",
+  "input_hex": "000000010000C3500000D2F000000064",
+  "parsed": {
+    "type": 1,
+    "strike": 50000,
+    "spot": 54000,
+    "quantity": 100
+  }
+}

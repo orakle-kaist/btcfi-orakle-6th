@@ -1,10 +1,11 @@
-FROM archlinux:latest
+FROM ubuntu:22.04
 
 # Install dependencies
-RUN pacman -Syu --noconfirm \
-    && pacman -S --noconfirm base-devel git sudo vim
-
-RUN pacman -Syu --noconfirm autoconf automake curl python3 libmpc mpfr gmp gawk base-devel bison flex texinfo gperf libtool patchutils bc zlib expat libslirp
+RUN apt-get update && apt-get install -y \
+    build-essential git sudo vim \
+    autoconf automake curl python3 libmpc-dev libmpfr-dev libgmp-dev gawk \
+    bison flex texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev \
+    && apt-get clean
 
 RUN mkdir /src && \
   cd /src && \
@@ -24,9 +25,7 @@ RUN cd /src && curl -LJO https://github.com/gcc-mirror/gcc/raw/master/libgcc/con
 ARG INSTALL_QEMU=false
 
 # Skip QEMU installation for now (dependency issues)
-RUN pacman -Sy --noconfirm
-
-RUN pacman -Sy --noconfirm dos2unix
+RUN apt-get update && apt-get install -y dos2unix && apt-get clean
 
 ENV PATH=/riscv32/bin:$PATH
 

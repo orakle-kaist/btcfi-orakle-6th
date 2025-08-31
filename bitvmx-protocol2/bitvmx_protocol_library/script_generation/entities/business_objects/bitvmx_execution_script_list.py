@@ -2,6 +2,7 @@ from multiprocessing import Manager, Process
 from multiprocessing.managers import ListProxy
 from time import time
 from typing import Dict, List, Optional, Union
+from prover_app.common.hexsafe import bfromhex_safe
 
 from bitcoinutils.constants import LEAF_VERSION_TAPSCRIPT
 from bitcoinutils.keys import P2trAddress, PublicKey
@@ -422,7 +423,11 @@ class BitVMXExecutionScriptList(BaseModel):
     def get_control_block_hex(self, public_key: PublicKey, index: int, is_odd: bool) -> str:
 
         leaf_version = bytes([(1 if is_odd else 0) + LEAF_VERSION_TAPSCRIPT])
-        pub_key = bytes.fromhex(public_key.to_x_only_hex())
+        # Ensure to_x_only_hex returns a string
+        xonly_hex = public_key.to_x_only_hex()
+        if isinstance(xonly_hex, bytes):
+            xonly_hex = xonly_hex.hex()
+        pub_key = bfromhex_safe(xonly_hex)
 
         init_time = time()
         split_list_for_merkle_tree_service = SplitListForMerkleTreeService()

@@ -88,7 +88,7 @@ class ExecutionChallengeScriptFromKeyGeneratorService:
         script = script + execution_script
 
         script.extend(
-            [PublicKey(hex_str=signature_public_keys[-1]).to_x_only_hex(), "OP_CHECKSIGVERIFY"]
+            [PublicKey(signature_public_keys[-1]).to_x_only_hex(), "OP_CHECKSIGVERIFY"]
         )
 
         script.append(1)

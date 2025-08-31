@@ -5,9 +5,10 @@ class NextStepPostViewControllerV1:
         self.publish_next_step_controller = publish_next_step_controller
     
     async def __call__(self, next_step_post_view_input: NextStepPostV1Input) -> NextStepPostV1Output:
-        # Call the actual BitVMX next step controller
+        # Call the actual BitVMX next step controller with force_resign parameter
         result = await self.publish_next_step_controller(
-            setup_uuid=next_step_post_view_input.setup_uuid
+            setup_uuid=next_step_post_view_input.setup_uuid,
+            force_resign=next_step_post_view_input.force_resign
         )
         
         return NextStepPostV1Output(

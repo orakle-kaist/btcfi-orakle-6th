@@ -22,12 +22,20 @@ class VerifierTimeoutScriptGeneratorService:
     ):
         script = BitcoinScript()
         for signature_public_key in signature_public_keys:
-            script.extend(
-                [
-                    PublicKey(hex_str=signature_public_key).to_x_only_hex(),
-                    "OP_CHECKSIGVERIFY",
-                ]
-            )
+            # Debug: Check key format
+            if not signature_public_key or len(signature_public_key) != 66:
+                print(f"[DEBUG] Invalid public key length: {len(signature_public_key) if signature_public_key else 0} - key: {signature_public_key[:20] if signature_public_key else 'None'}...")
+            try:
+                script.extend(
+                    [
+                        PublicKey(signature_public_key).to_x_only_hex(),
+                        "OP_CHECKSIGVERIFY",
+                    ]
+                )
+            except Exception as e:
+                print(f"[ERROR] Failed to process public key: {signature_public_key}")
+                print(f"[ERROR] Exception: {e}")
+                raise
         total_amount_of_seconds = timeout_wait_time.total_seconds()
         total_amount_of_blocks = ceil(total_amount_of_seconds / 600)
         interval = Sequence(

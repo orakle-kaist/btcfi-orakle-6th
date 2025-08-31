@@ -47,7 +47,7 @@ class TriggerWrongProgramCounterChallengeScriptGeneratorService:
         for signature_public_key in signature_public_keys:
             script.extend(
                 [
-                    PublicKey(hex_str=signature_public_key).to_x_only_hex(),
+                    PublicKey(signature_public_key).to_x_only_hex(),
                     "OP_CHECKSIGVERIFY",
                 ]
             )

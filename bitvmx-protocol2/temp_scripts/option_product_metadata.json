@@ -1,0 +1,14 @@
+{
+  "product_id": "BTCOPT-2025-50K-CALL",
+  "product_type": "CALL_OPTION",
+  "underlying": "BTC/USD",
+  "strike_price": 50000,
+  "expiry_date": "2025-01-31T00:00:00Z",
+  "quantity": 1.0,
+  "premium": 0.05,
+  "settlement_type": "CASH",
+  "bitvmx_setup_uuid": "c12110dc-9b90-4492-a0b1-6c70389ed4c8",
+  "hash_result_tx": "02000000000101a71804141ceb569f544a87ee08b112b04850b46cf6e852e8fec7599f2f77fa090000000000ffffffff014a6dd7170000000022512010c3f86a0249a26170699edaf94e5be00da9f05380dc2450e8fb29fb1e0ae6a9024730440220223910850864329b199962308253aa3481f9c152d872357f2b9d4ae35ffe311b02206a015898fbbc2180e8bbbea88d84b619554ef7a66c85a2dacb90523556b9b36a012103bf751f0d2d22e6f0163c9acaa14ae04e6e1a004cb4a24d893c1f86314e79d5de00000000",
+  "registration_timestamp": "2025-08-25T17:31:00Z",
+  "status": "PENDING_CONFIRMATION"
+}

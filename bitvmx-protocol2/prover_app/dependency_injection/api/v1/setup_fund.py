@@ -1,7 +1,7 @@
 from dependency_injector import containers, providers
 
 from bitvmx_protocol_library.config import common_protocol_properties
-from prover_app.api.v1.setup.fund.view_controllers.post import SetupFundPostViewControllerV1
+from prover_app.api.v1.setup.fund.v1.view_controllers.post import SetupFundPostViewControllerV1
 from prover_app.config import protocol_properties
 from prover_app.dependency_injection.domain.create_setup_with_funding import (
     CreateSetupWithFundingControllers,

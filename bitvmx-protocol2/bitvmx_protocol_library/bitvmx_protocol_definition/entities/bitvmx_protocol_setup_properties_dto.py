@@ -28,6 +28,7 @@ class BitVMXProtocolSetupPropertiesDTO(BaseModel):
     step_fees_satoshis: int
     funding_tx_id: str
     funding_index: int
+    funding_private_key: Optional[str] = None
     verifier_address_dict: Dict[str, str]
     prover_destination_address: str
     prover_signature_public_key: str

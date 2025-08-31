@@ -1,4 +1,5 @@
 import asyncio
+from prover_app.common.hexsafe import bfromhex_safe
 from typing import List
 
 import httpx
@@ -86,7 +87,7 @@ class PublishNextStepController:
         self.bitvmx_protocol_prover_dto_persistence = bitvmx_protocol_prover_dto_persistence
         self.execution_trace_query_service = ExecutionTraceQueryService("prover_files/")
 
-    def __call__(self, setup_uuid: str) -> TransactionProverStepType:
+    def __call__(self, setup_uuid: str, force_resign: bool = False) -> TransactionProverStepType:
 
         bitvmx_protocol_prover_private_dto = (
             self.bitvmx_protocol_prover_private_dto_persistence.get(setup_uuid=setup_uuid)
@@ -100,7 +101,7 @@ class PublishNextStepController:
         )
 
         wintertniz_private_key = PrivateKey(
-            b=bytes.fromhex(bitvmx_protocol_prover_private_dto.winternitz_private_key)
+            b=bfromhex_safe(bitvmx_protocol_prover_private_dto.winternitz_private_key)
         )
 
         if bitvmx_protocol_prover_dto.last_confirmed_step is None:

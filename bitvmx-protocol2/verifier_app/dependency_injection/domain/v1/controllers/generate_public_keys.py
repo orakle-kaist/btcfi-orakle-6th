@@ -15,9 +15,17 @@ from verifier_app.dependency_injection.persistences.bitvmx_protocol_setup_proper
 from verifier_app.dependency_injection.persistences.bitvmx_protocol_verifier_private_dto_persistences import (
     BitVMXProtocolVerifierPrivateDTOPersistences,
 )
-from verifier_app.domain.controllers.v1.public_keys.generate_public_keys_controller import (
-    GeneratePublicKeysController,
-)
+# Use optimized controller to avoid serialization issues
+try:
+    from verifier_app.domain.controllers.v1.public_keys.generate_public_keys_controller_optimized import (
+        GeneratePublicKeysControllerOptimized as GeneratePublicKeysController,
+    )
+    print("[OPTIMIZED] Using optimized GeneratePublicKeysController")
+except ImportError:
+    from verifier_app.domain.controllers.v1.public_keys.generate_public_keys_controller import (
+        GeneratePublicKeysController,
+    )
+    print("[WARNING] Failed to load optimized controller, using default")
 
 
 class GeneratePublicKeysControllers(containers.DeclarativeContainer):

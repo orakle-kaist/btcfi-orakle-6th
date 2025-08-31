@@ -34,7 +34,11 @@ class TriggerWrongTraceStepScriptGeneratorService:
                 if not signature_public_key or len(signature_public_key) < 66:
                     print(f"[ERROR] Invalid signature_public_key: '{signature_public_key}' (length: {len(signature_public_key) if signature_public_key else 0})")
                     continue
-                public_key_obj = PublicKey.from_hex(signature_public_key)
+                try:
+                    public_key_obj = PublicKey.from_hex(signature_public_key)
+                except Exception as e:
+                    print(f"[ERROR] Failed to parse public key '{signature_public_key}': {e}")
+                    continue
             else:
                 public_key_obj = signature_public_key
             

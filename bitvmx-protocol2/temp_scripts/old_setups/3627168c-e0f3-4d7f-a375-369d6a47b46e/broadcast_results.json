@@ -1,0 +1,70 @@
+{
+  "timestamp": 1756190987.841307,
+  "results": [
+    {
+      "tx": "hash_result_tx",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-26,\"message\":\"mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)\"}"
+    },
+    {
+      "tx": "trigger_protocol_tx",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-25,\"message\":\"bad-txns-inputs-missingorspent\"}"
+    },
+    {
+      "tx": "search_hash_tx_list[0]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-22,\"message\":\"TX decode failed. Make sure the tx has at least one input.\"}"
+    },
+    {
+      "tx": "search_hash_tx_list[1]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-22,\"message\":\"TX decode failed. Make sure the tx has at least one input.\"}"
+    },
+    {
+      "tx": "search_choice_tx_list[0]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-25,\"message\":\"bad-txns-inputs-missingorspent\"}"
+    },
+    {
+      "tx": "search_choice_tx_list[1]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-25,\"message\":\"bad-txns-inputs-missingorspent\"}"
+    },
+    {
+      "tx": "read_search_hash_tx_list[0]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-26,\"message\":\"mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)\"}"
+    },
+    {
+      "tx": "read_search_hash_tx_list[1]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-25,\"message\":\"bad-txns-inputs-missingorspent\"}"
+    },
+    {
+      "tx": "read_search_hash_tx_list[2]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-22,\"message\":\"TX decode failed. Make sure the tx has at least one input.\"}"
+    },
+    {
+      "tx": "read_search_hash_tx_list[3]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-22,\"message\":\"TX decode failed. Make sure the tx has at least one input.\"}"
+    },
+    {
+      "tx": "read_search_choice_tx_list[0]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-25,\"message\":\"bad-txns-inputs-missingorspent\"}"
+    },
+    {
+      "tx": "read_search_choice_tx_list[1]",
+      "status": "failed",
+      "error": "sendrawtransaction RPC error: {\"code\":-25,\"message\":\"bad-txns-inputs-missingorspent\"}"
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "success": 0,
+    "failed": 12
+  }
+}

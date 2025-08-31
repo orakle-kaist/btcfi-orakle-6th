@@ -23,7 +23,8 @@ RUN pip install -r /tmp/requirements/base.txt
 RUN pip install --no-cache-dir git+https://github.com/ramonamela/python-bitcoin-utils.git@3e8c2a0bf1b080ed5f80f4e78f71005f42eb52c5
 #RUN pip install --no-cache-dir git+https://github.com/ramonamela/python-bitcoin-utils.git@5b213cb10a6fe810fb9c0606608bfbc05789cd3a
 
-RUN pip install --no-cache-dir git+https://github.com/ramonamela/pybitvmbinding.git@32e970dc3d4321453dae949c36308f816352ffa3
+# Temporarily skip pybitvmbinding due to build issues
+# RUN pip install --no-cache-dir git+https://github.com/ramonamela/pybitvmbinding.git@32e970dc3d4321453dae949c36308f816352ffa3
 
 RUN mkdir /bitvmx-backend
 
@@ -52,7 +53,7 @@ COPY ./prover_app ./prover_app
 COPY ./bitvmx_protocol_library ./bitvmx_protocol_library
 RUN mkdir prover_files
 
-CMD ["uvicorn", "prover_app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "debug", "--lifespan", "on"]
+CMD ["uvicorn", "prover_app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "debug", "--lifespan", "on", "--timeout-keep-alive", "300"]
 
 FROM bitvmx-base as verifier-backend
 
@@ -66,4 +67,4 @@ COPY ./verifier_app ./verifier_app
 COPY ./bitvmx_protocol_library ./bitvmx_protocol_library
 RUN mkdir verifier_files
 
-CMD ["uvicorn", "verifier_app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "debug", "--lifespan", "on"]
+CMD ["uvicorn", "verifier_app.main:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "debug", "--lifespan", "on", "--timeout-keep-alive", "300"]

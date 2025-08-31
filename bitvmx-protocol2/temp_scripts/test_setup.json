@@ -1,0 +1,13 @@
+{
+  "max_amount_of_steps": 100,
+  "amount_of_input_words": 4,
+  "amount_of_bits_wrong_step_search": 3,
+  "amount_of_bits_per_digit_checksum": 4,
+  "funding_tx_id": "83b49b175eacb5856c8433bb95a9a110276500191990166490cbc7967d152b67",
+  "funding_index": 0,
+  "secret_origin_of_funds": "74516cab24ab8e3bea8274dbf19d7a66661da91a419ba51a85ef7c7b8b0968d8",
+  "verifier_list": [],
+  "prover_destination_address": "tb1qd28npep0s8frcm3y7dxqajkcy2m40eysplyr9v",
+  "prover_signature_private_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "prover_signature_public_key": "02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

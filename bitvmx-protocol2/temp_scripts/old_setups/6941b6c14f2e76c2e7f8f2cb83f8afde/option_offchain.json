@@ -1,0 +1,14 @@
+{
+  "option_data": {
+    "option_id": "opt_1756187804",
+    "type": "CALL",
+    "strike": 65000,
+    "expiry": "2025-02-01",
+    "quantity": 1.0,
+    "buyer": "bc1q...",
+    "premium": 2000,
+    "timestamp": 1756187804
+  },
+  "commitment_full": "96792048efb7b8934d9ad04d4616ec96cb34e27d7237d7cce752bf7363e118a1",
+  "commitment_onchain": "96792048"
+}

@@ -44,7 +44,7 @@ class TriggerConstantEquivocationChallengeScriptsGeneratorService:
             script = BitcoinScript()
             for signature_public_key in reversed(signature_public_keys):
                 script.extend(
-                    [PublicKey(hex_str=signature_public_key).to_x_only_hex(), "OP_CHECKSIGVERIFY"]
+                    [PublicKey(signature_public_key).to_x_only_hex(), "OP_CHECKSIGVERIFY"]
                 )
 
             self.verify_input_nibble_message_from_public_keys(

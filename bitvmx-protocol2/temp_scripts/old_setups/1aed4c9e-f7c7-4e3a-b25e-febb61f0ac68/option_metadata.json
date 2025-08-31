@@ -1,0 +1,11 @@
+{
+  "option_data": {
+    "type": "PUT",
+    "strike": 50000,
+    "spot": 54000,
+    "quantity": 100,
+    "setup_uuid": "1aed4c9e-f7c7-4e3a-b25e-febb61f0ac68"
+  },
+  "commitment": "625aa0ca",
+  "full_commitment": "625aa0cab5fe2f8a94e2d031cb92af12275232e95cf2947aebd202fc7319c4f0"
+}

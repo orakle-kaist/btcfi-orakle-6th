@@ -1,4 +1,5 @@
 import secrets
+from prover_app.common.hexsafe import bfromhex_safe
 
 from bitcoinutils.keys import PrivateKey
 
@@ -25,11 +26,11 @@ class SetupPostViewControllerV1:
             controlled_prover_private_key = PrivateKey(b=secrets.token_bytes(32))
         else:
             controlled_prover_private_key = PrivateKey(
-                b=bytes.fromhex(self.protocol_properties.prover_private_key)
+                b=bfromhex_safe(self.protocol_properties.prover_private_key)
             )
 
         origin_of_funds_private_key = PrivateKey(
-            b=bytes.fromhex(setup_post_view_input.secret_origin_of_funds)
+            b=bfromhex_safe(setup_post_view_input.secret_origin_of_funds)
         )
 
         setup_uuid = await self.create_setup_controller(

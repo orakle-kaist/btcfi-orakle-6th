@@ -1,0 +1,27 @@
+{
+  "setup_uuid": "a72c9742-bddb-4fdd-800e-a9aa5b983b2e",
+  "network": "mutinynet",
+  "name": "BTCFi Option Product Registration",
+  "max_amount_of_steps": 50000,
+  "amount_of_bits_wrong_step_search": 1,
+  "funding_tx_id": "f4d15aa4bf034ae7338e9ae7176f369dd77ae068bb527d96c233d39db0df80ce",
+  "funding_index": 0,
+  "funding_amount_of_satoshis": 100000,
+  "secret_origin_of_funds": "d8a1e1224e63135765bde9dc8a2c8e403eee8be73d3589d58c5ddbf9dce3fdf4",
+  "prover_destination_address": "tb1qt8rdur557nz338g3lekc6458pj0dl63c0s9904",
+  "prover_signature_private_key": "0000000000000000000000000000000000000000000000000000000000000001",
+  "prover_signature_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "verifier_signature_private_key": "0000000000000000000000000000000000000000000000000000000000000002",
+  "verifier_signature_public_key": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+  "amount_of_input_words": 1,
+  "amount_of_public_inputs": 1,
+  "list_of_public_inputs": [
+    "d8e4daa0"
+  ],
+  "rom_commitment_file": "execution_files/instruction_commitment_option_registration.txt",
+  "elf_file": "execution_files/btcfi_option_registration_v2.elf",
+  "step_fees_satoshis": 3000,
+  "max_fee_allowed": 100000,
+  "verifier_list": [],
+  "prover_publishing_transaction_id": null
+}
