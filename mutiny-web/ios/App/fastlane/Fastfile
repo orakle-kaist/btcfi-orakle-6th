@@ -1,0 +1,107 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:ios)
+
+ISSUER_ID = ENV["APPLE_ISSUER_ID"]
+KEY_ID = ENV["APPLE_KEY_ID"]
+KEY_CONTENT = ENV["APPLE_KEY_CONTENT"]
+
+KEYCHAIN_NAME = ENV["KEYCHAIN_NAME"]
+KEYCHAIN_PASSWORD = ENV["KEYCHAIN_PASSWORD"]
+APP_INDENTIFIER = ENV["DEVELOPER_APP_INDENTIFIER"]
+
+def delete_temp_keychain(name)
+  delete_keychain(
+    name: name
+  ) if File.exist? File.expand_path("~/Library/Keychains/#{name}-db")
+end
+
+def create_temp_keychain(name, password)
+  create_keychain(
+    name: name,
+    password: password,
+    unlock: false,
+    timeout: 0
+  )
+end
+
+def ensure_temp_keychain(name, password)
+  delete_temp_keychain(name)
+  create_temp_keychain(name, password)
+end
+
+platform :ios do
+  desc "Push a new beta build to TestFlight"
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id: KEY_ID,
+      issuer_id: ISSUER_ID,
+      key_content: KEY_CONTENT
+    )
+
+    # In CI we don't want to be prompted for a password
+    ensure_temp_keychain(KEYCHAIN_NAME, KEYCHAIN_PASSWORD)
+
+    match(
+      type: "appstore",
+      keychain_name: KEYCHAIN_NAME,
+      keychain_password: KEYCHAIN_PASSWORD,
+      readonly: is_ci
+    )
+
+    testflight_build_num = app_store_build_number(
+      live: false,
+      api_key: api_key,
+      app_identifier: APP_INDENTIFIER
+    )
+
+    increment_build_number(
+      build_number: testflight_build_num + 1,
+      xcodeproj: "App.xcodeproj"
+    )
+
+    build_app(
+      workspace: "App.xcworkspace",
+      scheme: "App",
+      xcargs: "-allowProvisioningUpdates"
+    )
+    upload_to_testflight(api_key: api_key, skip_waiting_for_build_processing: true)
+  end
+
+  lane :build do
+    api_key = app_store_connect_api_key(
+      key_id: KEY_ID,
+      issuer_id: ISSUER_ID,
+      key_content: KEY_CONTENT
+    )
+
+    # In CI we don't want to be prompted for a password
+    ensure_temp_keychain(KEYCHAIN_NAME, KEYCHAIN_PASSWORD)
+
+    match(
+      type: "appstore",
+      keychain_name: KEYCHAIN_NAME,
+      keychain_password: KEYCHAIN_PASSWORD,
+      readonly: is_ci
+    )
+
+    build_app(
+      workspace: "App.xcworkspace",
+      scheme: "App",
+      xcargs: "-allowProvisioningUpdates"
+    )
+  end
+end

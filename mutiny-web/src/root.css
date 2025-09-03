@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+    touch-action: manipulation;
+    user-select: none;
+}
+
+html {
+    @apply disable-scrollbars;
+    @apply bg-m-grey-975;
+}
+
+body {
+    -webkit-overflow-scrolling: touch;
+    /* After load we need to remove the bg so the qr scanner can show through */
+    @apply text-white;
+    @apply !bg-transparent;
+    @apply flex w-full flex-1 flex-col safe-top safe-left safe-right safe-bottom min-h-device h-device;
+}
+
+#root {
+    @apply mx-auto flex w-full max-w-[600px] flex-1 flex-col;
+}
+
+@media (prefers-color-scheme: light) {
+    /* we don't support this but I want the browser to know I care */
+}
+
+#mutiny-logo {
+    image-rendering: pixelated;
+}
+
+.bg-gradient {
+    @apply bg-gradient-to-b from-black to-[#0b215b] bg-fixed bg-no-repeat;
+}
+
+.bg-gray {
+    @apply bg-gradient-to-b from-[hsl(224,5%,5%)] to-[hsl(224,5%,20%)] bg-fixed bg-no-repeat;
+}
+
+.react-modal-sheet-container {
+    @apply !bg-[#262626];
+}
+
+a {
+    @apply underline decoration-m-grey-400 hover:decoration-white;
+}
+
+p {
+    @apply font-light;
+}
+
+p:not(:last-child) {
+    @apply mb-2;
+}
+
+#video-container {
+    position: relative;
+    width: max-content;
+    height: max-content;
+    overflow: hidden;
+    @apply bg-transparent;
+}
+
+#video-container .scan-region-highlight {
+    border-radius: 30px;
+    outline: rgba(0, 0, 0, 0.25) solid 50vmax;
+}
+
+#video-container .scan-region-highlight-svg {
+    display: none;
+}
+
+select {
+    @apply appearance-none;
+    @apply block;
+    @apply border-[2px] ring-offset-black focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply text-lg font-light;
+    @apply py-4 pl-4 pr-8;
+    background-image: url("data:image/svg+xml,%3Csvg aria-hidden='true' class='w-4 h-4 ml-1' fill='white' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 0 1 1.414 0L10 10.586l3.293-3.293a1 1 0 1 1 1.414 1.414l-4 4a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 0-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-size: 20px 20px;
+    background-repeat: no-repeat;
+}
+
+strong {
+    @apply font-semibold;
+}
+
+@layer components {
+    .shiny-button {
+        @apply border-b border-t border-b-white/10 border-t-white/50 active:-mb-[1px] active:mt-[1px] active:opacity-70;
+    }
+}
+
+.crt::before {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(
+            rgba(18, 16, 16, 0) 50%,
+            rgba(0, 0, 0, 0.25) 50%
+        ),
+        linear-gradient(
+            90deg,
+            rgba(255, 0, 0, 0.06),
+            rgba(0, 255, 0, 0.02),
+            rgba(0, 0, 255, 0.06)
+        );
+    z-index: 2;
+    background-size:
+        100% 2px,
+        3px 100%;
+    pointer-events: none;
+    border-radius: 1rem;
+}

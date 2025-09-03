@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+    <head>
+        <title data-sm="">Mutiny Wallet</title>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0 height=device-height viewport-fit=cover user-scalable=no"
+        />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#171717" />
+        <meta
+            name="description"
+            content="Mutiny is a self-custodial lightning wallet that runs in the browser."
+        />
+        <link rel="icon" href="/favicon.ico" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Mutiny Wallet" />
+        <meta
+            name="twitter:description"
+            content="Mutiny is a self-custodial lightning wallet that runs in the browser."
+        />
+        <meta name="twitter:site" content="https://app.mutinywallet.com/" />
+        <meta
+            name="twitter:image"
+            content="https://app.mutinywallet.com/images/twitter_card_image.png"
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Mutiny Wallet" />
+        <meta
+            property="og:description"
+            content="Mutiny is a self-custodial lightning wallet that runs in the browser."
+        />
+        <meta property="og:url" content="https://app.mutinywallet.com/" />
+        <meta
+            property="og:image"
+            content="https://app.mutinywallet.com/images/twitter_card_image.png"
+        />
+        <link rel="apple-touch-icon" href="/images/icon.png" sizes="512x512" />
+        <link rel="mask-icon" href="/mutiny_logo_mask.svg" color="#000" />
+        <style>
+            #no-wasm {
+                display: none;
+            }
+
+            #no-wasm,
+            #no-script {
+                margin: 1rem;
+            }
+            body {
+                background-color: hsla(0, 0%, 5%, 1);
+            }
+        </style>
+    </head>
+    <body>
+        <div id="no-wasm">
+            <p>
+                <img
+                    src="/mutiny-pixel-logo.png"
+                    width="75px"
+                    alt="Mutiny Wallet"
+                />
+            </p>
+            <p>
+                Your browser does not support WebAssembly, or it's disabled.
+                Please update or enable WebAssembly to run this app.
+            </p>
+            <p>
+                If you're running iOS in lockdown mode you'll need to
+                <a href="https://support.apple.com/en-us/HT212650"
+                    >add an exception for Mutiny Wallet.</a
+                >
+            </p>
+        </div>
+        <noscript>
+            <div id="no-script">
+                <p>
+                    <img
+                        src="/mutiny-pixel-logo.png"
+                        width="75px"
+                        alt="Mutiny Wallet"
+                    />
+                </p>
+                <p>
+                    Mutiny is a self-custodial wallet that runs in the browser.
+                    JavaScript must be enabled.
+                </p>
+            </div>
+        </noscript>
+        <div id="root"></div>
+        <script type="module" src="/src/index.tsx"></script>
+        <script>
+            // Check for WebAssembly support
+            if (
+                typeof WebAssembly === "object" &&
+                typeof WebAssembly.instantiate === "function"
+            ) {
+                var module = new WebAssembly.Module(
+                    new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])
+                ); // This is an empty wasm module
+                if (
+                    WebAssembly.Module instanceof Function &&
+                    module instanceof WebAssembly.Module
+                )
+                    console.log("WebAssembly is supported");
+                else document.getElementById("no-wasm").style.display = "block";
+            } else {
+                document.getElementById("no-wasm").style.display = "block";
+            }
+        </script>
+    </body>
+</html>
