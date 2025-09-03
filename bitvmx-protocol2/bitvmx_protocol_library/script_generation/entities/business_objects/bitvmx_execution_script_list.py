@@ -1,7 +1,7 @@
-from multiprocessing import Manager, Process
-from multiprocessing.managers import ListProxy
 from time import time
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
+import hashlib
+import json
 from prover_app.common.hexsafe import bfromhex_safe
 
 from bitcoinutils.constants import LEAF_VERSION_TAPSCRIPT
@@ -23,6 +23,30 @@ from bitvmx_protocol_library.script_generation.services.split_list_for_merkle_tr
 )
 
 
+# Enhanced cache for merkle root calculations with content-based keys
+_merkle_cache = {}
+_cache_stats = {'hits': 0, 'misses': 0}
+
+def _serialize_execution_tree(tree):
+    """Convert execution tree to stable string for caching"""
+    if isinstance(tree, str):
+        return f"key:{tree}"
+    elif isinstance(tree, list):
+        if not tree:
+            return "empty_list"
+        serialized = [_serialize_execution_tree(item) for item in tree]
+        return f"list:[{','.join(serialized)}]"
+    else:
+        return f"other:{str(tree)}"
+
+def _get_stable_execution_cache_key(tree, sig_keys, pub_keys, trace_lengths, checksum_bits):
+    """Generate stable cache key for execution scripts"""
+    tree_str = _serialize_execution_tree(tree)
+    # Create a simplified parameter signature
+    params_str = f"sig:{len(sig_keys or [])}:pub:{len(pub_keys or [])}:trace:{str(trace_lengths)}:bits:{checksum_bits}"
+    combined = f"{tree_str}:{params_str}"
+    return hashlib.sha256(combined.encode('utf-8')).hexdigest()[:32]
+
 def _get_tag_hashed_merkle_root(
     splitted_key_list: Union[List, str],
     signature_public_keys: List[str],
@@ -33,18 +57,31 @@ def _get_tag_hashed_merkle_root(
     opcode_dict: Dict[str, str],
     trace_to_script_mapping: List[int],
     depth: int,
-    shared_list: Optional[ListProxy] = None,
 ):
 
+    # Generate content-based cache key
+    cache_key = _get_stable_execution_cache_key(
+        splitted_key_list,
+        signature_public_keys,
+        public_keys,
+        trace_words_lengths,
+        bits_per_digit_checksum
+    )
+    
+    # Check cache with statistics
+    if cache_key in _merkle_cache:
+        _cache_stats['hits'] += 1
+        return _merkle_cache[cache_key]
+    
+    _cache_stats['misses'] += 1
+    
     if not splitted_key_list:
-        if shared_list:
-            shared_list[0] = b""
-            return
-        else:
-            return b""
+        return b""
+    
     execution_challenge_script_from_key_generator_service = (
         ExecutionChallengeScriptFromKeyGeneratorService()
     )
+    
     if not isinstance(splitted_key_list, list):
         current_script = execution_challenge_script_from_key_generator_service(
             splitted_key_list,
@@ -56,130 +93,56 @@ def _get_tag_hashed_merkle_root(
             opcode_dict,
             trace_to_script_mapping,
         )
-        if shared_list:
-            shared_list[0] = tapleaf_tagged_hash(current_script)
-            return
-        else:
-            return tapleaf_tagged_hash(current_script)
-    # list
+        result = tapleaf_tagged_hash(current_script)
+        _merkle_cache[cache_key] = result
+        return result
+    
+    # Handle list cases
+    if len(splitted_key_list) == 0:
+        return b""
+    elif len(splitted_key_list) == 1:
+        result = _get_tag_hashed_merkle_root(
+            splitted_key_list[0],
+            signature_public_keys,
+            public_keys,
+            trace_words_lengths,
+            bits_per_digit_checksum,
+            instruction_dict,
+            opcode_dict,
+            trace_to_script_mapping,
+            depth + 1
+        )
+        _merkle_cache[cache_key] = result
+        return result
+    elif len(splitted_key_list) == 2:
+        # Simple recursion without parallelization
+        left = _get_tag_hashed_merkle_root(
+            splitted_key_list[0],
+            signature_public_keys,
+            public_keys,
+            trace_words_lengths,
+            bits_per_digit_checksum,
+            instruction_dict,
+            opcode_dict,
+            trace_to_script_mapping,
+            depth + 1
+        )
+        right = _get_tag_hashed_merkle_root(
+            splitted_key_list[1],
+            signature_public_keys,
+            public_keys,
+            trace_words_lengths,
+            bits_per_digit_checksum,
+            instruction_dict,
+            opcode_dict,
+            trace_to_script_mapping,
+            depth + 1
+        )
+        result = tapbranch_tagged_hash(left, right)
+        _merkle_cache[cache_key] = result
+        return result
     else:
-        if len(splitted_key_list) == 0:
-            if shared_list:
-                shared_list[0] = b""
-                return
-            else:
-                return b""
-        elif len(splitted_key_list) == 1:
-            if depth < 4:
-                manager = Manager()
-                new_shared_list = manager.list([None])
-                process = Process(
-                    target=_get_tag_hashed_merkle_root,
-                    args=(
-                        splitted_key_list[0],
-                        signature_public_keys,
-                        public_keys,
-                        trace_words_lengths,
-                        bits_per_digit_checksum,
-                        instruction_dict,
-                        opcode_dict,
-                        trace_to_script_mapping,
-                        depth + 1,
-                        new_shared_list,
-                    ),
-                )
-                process.start()
-                process.join()
-                result = new_shared_list[0]
-            else:
-                result = _get_tag_hashed_merkle_root(
-                    splitted_key_list[0],
-                    signature_public_keys,
-                    public_keys,
-                    trace_words_lengths,
-                    bits_per_digit_checksum,
-                    instruction_dict,
-                    opcode_dict,
-                    trace_to_script_mapping,
-                    depth + 1,
-                )
-            if shared_list:
-                shared_list[0] = result
-            else:
-                return result
-        elif len(splitted_key_list) == 2:
-            if depth < 4:
-                manager = Manager()
-                new_left_shared_list = manager.list([None])
-                new_right_shared_list = manager.list([None])
-                left_process = Process(
-                    target=_get_tag_hashed_merkle_root,
-                    args=(
-                        splitted_key_list[0],
-                        signature_public_keys,
-                        public_keys,
-                        trace_words_lengths,
-                        bits_per_digit_checksum,
-                        instruction_dict,
-                        opcode_dict,
-                        trace_to_script_mapping,
-                        depth + 1,
-                        new_left_shared_list,
-                    ),
-                )
-                right_process = Process(
-                    target=_get_tag_hashed_merkle_root,
-                    args=(
-                        splitted_key_list[1],
-                        signature_public_keys,
-                        public_keys,
-                        trace_words_lengths,
-                        bits_per_digit_checksum,
-                        instruction_dict,
-                        opcode_dict,
-                        trace_to_script_mapping,
-                        depth + 1,
-                        new_right_shared_list,
-                    ),
-                )
-                left_process.start()
-                right_process.start()
-                left_process.join()
-                right_process.join()
-                left_result = new_left_shared_list[0]
-                right_result = new_right_shared_list[0]
-                result = tapbranch_tagged_hash(left_result, right_result)
-            else:
-                left = _get_tag_hashed_merkle_root(
-                    splitted_key_list[0],
-                    signature_public_keys,
-                    public_keys,
-                    trace_words_lengths,
-                    bits_per_digit_checksum,
-                    instruction_dict,
-                    opcode_dict,
-                    trace_to_script_mapping,
-                    depth + 1,
-                )
-                right = _get_tag_hashed_merkle_root(
-                    splitted_key_list[1],
-                    signature_public_keys,
-                    public_keys,
-                    trace_words_lengths,
-                    bits_per_digit_checksum,
-                    instruction_dict,
-                    opcode_dict,
-                    trace_to_script_mapping,
-                    depth + 1,
-                )
-                result = tapbranch_tagged_hash(left, right)
-            if shared_list:
-                shared_list[0] = result
-            else:
-                return result
-        else:
-            # Raise an error if a branch node contains more than two elements
-            raise ValueError("Invalid Merkle branch: List cannot have more than 2 branches.")
+        raise ValueError("Invalid Merkle branch: List cannot have more than 2 branches.")
 
 
 def _traverse_level(
@@ -194,11 +157,10 @@ def _traverse_level(
     instruction_dict: Dict[str, str],
     opcode_dict: Dict[str, str],
     trace_to_script_mapping: List[int],
-    shared_list: Optional[ListProxy] = None,
 ):
     if isinstance(level, list):
         if len(level) == 1:
-            result = _traverse_level(
+            return _traverse_level(
                 index,
                 level[0],
                 already_traversed,
@@ -211,124 +173,56 @@ def _traverse_level(
                 opcode_dict,
                 trace_to_script_mapping,
             )
-            if shared_list is None:
-                return result
-            else:
-                shared_list[0] = result
-                return
         if len(level) == 2:
             current_low_values_per_branch = int(
                 (2 ** BitVMXExecutionScriptList.get_tree_depth([level[0]])) / 2
             )
-            if depth < 4:
-                manager = Manager()
-                new_left_shared_list = manager.list([None])
-                new_right_shared_list = manager.list([None])
-                a_process = Process(
-                    target=_traverse_level,
-                    args=(
-                        index,
-                        level[0],
-                        already_traversed,
-                        depth + 1,
-                        signature_public_keys,
-                        public_keys,
-                        trace_words_lengths,
-                        bits_per_digit_checksum,
-                        instruction_dict,
-                        opcode_dict,
-                        trace_to_script_mapping,
-                        new_left_shared_list,
-                    ),
-                )
-                b_process = Process(
-                    target=_traverse_level,
-                    args=(
-                        index,
-                        level[1],
-                        already_traversed + current_low_values_per_branch,
-                        depth + 1,
-                        signature_public_keys,
-                        public_keys,
-                        trace_words_lengths,
-                        bits_per_digit_checksum,
-                        instruction_dict,
-                        opcode_dict,
-                        trace_to_script_mapping,
-                        new_right_shared_list,
-                    ),
-                )
-                a_process.start()
-                b_process.start()
-                a_process.join()
-                b_process.join()
-                a = new_left_shared_list[0]
-                b = new_right_shared_list[0]
-            else:
-                a = _traverse_level(
-                    index,
-                    level[0],
-                    already_traversed,
-                    depth + 1,
-                    signature_public_keys,
-                    public_keys,
-                    trace_words_lengths,
-                    bits_per_digit_checksum,
-                    instruction_dict,
-                    opcode_dict,
-                    trace_to_script_mapping,
-                )
-                b = _traverse_level(
-                    index,
-                    level[1],
-                    already_traversed + current_low_values_per_branch,
-                    depth + 1,
-                    signature_public_keys,
-                    public_keys,
-                    trace_words_lengths,
-                    bits_per_digit_checksum,
-                    instruction_dict,
-                    opcode_dict,
-                    trace_to_script_mapping,
-                )
+            
+            # Simple recursion without parallelization
+            a = _traverse_level(
+                index,
+                level[0],
+                already_traversed,
+                depth + 1,
+                signature_public_keys,
+                public_keys,
+                trace_words_lengths,
+                bits_per_digit_checksum,
+                instruction_dict,
+                opcode_dict,
+                trace_to_script_mapping,
+            )
+            b = _traverse_level(
+                index,
+                level[1],
+                already_traversed + current_low_values_per_branch,
+                depth + 1,
+                signature_public_keys,
+                public_keys,
+                trace_words_lengths,
+                bits_per_digit_checksum,
+                instruction_dict,
+                opcode_dict,
+                trace_to_script_mapping,
+            )
 
             if (already_traversed <= index) and (
                 index < already_traversed + current_low_values_per_branch
             ):
-                result = a + b
-                if shared_list is None:
-                    return result
-                else:
-                    shared_list[0] = result
-                    return
+                return a + b
             if (already_traversed + current_low_values_per_branch <= index) and (
                 index < (already_traversed + 2 * current_low_values_per_branch)
             ):
-                result = b + a
-                if shared_list is None:
-                    return result
-                else:
-                    shared_list[0] = result
-                    return
-            result = tapbranch_tagged_hash(a, b)
-            if shared_list is None:
-                return result
-            else:
-                shared_list[0] = result
-                return
+                return b + a
+            return tapbranch_tagged_hash(a, b)
         raise ValueError("Invalid Merkle branch: List cannot have more than 2 branches.")
     else:
         if already_traversed == index:
-            result = b""
-            if shared_list is None:
-                return result
-            else:
-                shared_list[0] = result
-                return
+            return b""
         execution_challenge_script_from_key_generator_service = (
             ExecutionChallengeScriptFromKeyGeneratorService()
         )
-        result = tapleaf_tagged_hash(
+        return tapleaf_tagged_hash(
             execution_challenge_script_from_key_generator_service(
                 level,
                 signature_public_keys,
@@ -340,12 +234,11 @@ def _traverse_level(
                 trace_to_script_mapping,
             )
         )
-        if shared_list is None:
-            return result
-        else:
-            shared_list[0] = result
-            return
 
+
+# 클래스 레벨 캐시 (모든 인스턴스가 공유)
+_global_control_block_cache: Dict[Tuple[str, int, bool, str], str] = {}
+_global_merkle_path_cache: Dict[Tuple[str, int], bytes] = {}
 
 class BitVMXExecutionScriptList(BaseModel):
 
@@ -358,6 +251,10 @@ class BitVMXExecutionScriptList(BaseModel):
     bits_per_digit_checksum: int
     taproot_address_pubkey: Optional[str] = None
     taproot_address_is_odd: Optional[bool] = None
+    
+    class Config:
+        # Pydantic이 private field를 무시하도록 설정
+        underscore_attrs_are_private = True
 
     @staticmethod
     def get_tree_depth(splitted_key_list: Union[List, str]):
@@ -395,19 +292,19 @@ class BitVMXExecutionScriptList(BaseModel):
                 self.instruction_dict,
                 self.opcode_dict,
                 self.trace_to_script_mapping(),
-                0,
+                0
             )
             end_time = time()
-            if end_time - init_time > 60:
-                print(
-                    "End of parallel hashed merkle root in "
-                    + str((time() - init_time) / 60)
-                    + " minutes."
-                )
+            elapsed = end_time - init_time
+            if elapsed > 60:
+                print(f"End of parallel hashed merkle root in {elapsed / 60:.2f} minutes.")
             else:
-                print(
-                    "End of parallel hashed merkle root in " + str(time() - init_time) + " seconds."
-                )
+                print(f"End of parallel hashed merkle root in {elapsed:.2f} seconds.")
+            
+            # Print cache statistics
+            if _cache_stats['hits'] + _cache_stats['misses'] > 0:
+                hit_rate = _cache_stats['hits'] / (_cache_stats['hits'] + _cache_stats['misses']) * 100
+                print(f"[CACHE STATS] Hits: {_cache_stats['hits']}, Misses: {_cache_stats['misses']}, Hit Rate: {hit_rate:.1f}%")
             tweak = tagged_hash(key_x + merkle_root, "TapTweak")
 
         tweak_int = b_to_i(tweak)
@@ -421,40 +318,90 @@ class BitVMXExecutionScriptList(BaseModel):
         return P2trAddress(witness_program=pubkey.hex(), is_odd=is_odd)
 
     def get_control_block_hex(self, public_key: PublicKey, index: int, is_odd: bool) -> str:
-
-        leaf_version = bytes([(1 if is_odd else 0) + LEAF_VERSION_TAPSCRIPT])
-        # Ensure to_x_only_hex returns a string
+        global _global_control_block_cache, _global_merkle_path_cache
+        
+        # 캐시 키 생성 (인스턴스 고유 식별자 포함)
         xonly_hex = public_key.to_x_only_hex()
         if isinstance(xonly_hex, bytes):
             xonly_hex = xonly_hex.hex()
+        
+        # key_list의 첫 번째 요소를 인스턴스 식별자로 사용
+        instance_id = self.key_list[0] if self.key_list else ""
+        cache_key = (xonly_hex, index, is_odd, instance_id)
+        
+        # 캐시 확인
+        if cache_key in _global_control_block_cache:
+            print(f"[CACHE HIT] Control block for index {index} retrieved from cache")
+            return _global_control_block_cache[cache_key]
+        
+        print(f"[CACHE MISS] Computing control block for index {index}")
+        
+        leaf_version = bytes([(1 if is_odd else 0) + LEAF_VERSION_TAPSCRIPT])
         pub_key = bfromhex_safe(xonly_hex)
 
-        init_time = time()
-        split_list_for_merkle_tree_service = SplitListForMerkleTreeService()
-        print("Start control block computation")
-        merkle_path = _traverse_level(
-            index,
-            split_list_for_merkle_tree_service(self.key_list),
-            0,
-            0,
-            self.signature_public_keys,
-            self.public_keys,
-            self.trace_words_lengths,
-            self.bits_per_digit_checksum,
-            self.instruction_dict,
-            self.opcode_dict,
-            self.trace_to_script_mapping(),
-        )
-        print("End of control block computation in " + str(time() - init_time) + " seconds.")
+        # merkle_path 캐싱 확인
+        merkle_cache_key = (instance_id, index)
+        if merkle_cache_key in _global_merkle_path_cache:
+            print(f"[CACHE HIT] Merkle path for index {index} retrieved from cache")
+            merkle_path = _global_merkle_path_cache[merkle_cache_key]
+        else:
+            init_time = time()
+            split_list_for_merkle_tree_service = SplitListForMerkleTreeService()
+            print("Start control block computation")
+            merkle_path = _traverse_level(
+                index,
+                split_list_for_merkle_tree_service(self.key_list),
+                0,
+                0,
+                self.signature_public_keys,
+                self.public_keys,
+                self.trace_words_lengths,
+                self.bits_per_digit_checksum,
+                self.instruction_dict,
+                self.opcode_dict,
+                self.trace_to_script_mapping(),
+            )
+            print("End of control block computation in " + str(time() - init_time) + " seconds.")
+            # merkle_path 캐시 저장
+            _global_merkle_path_cache[merkle_cache_key] = merkle_path
 
         control_block_bytes = leaf_version + pub_key + merkle_path
-        return control_block_bytes.hex()
+        control_block_hex = control_block_bytes.hex()
+        
+        # 캐시에 저장
+        _global_control_block_cache[cache_key] = control_block_hex
+        print(f"[CACHE] Stored control block for index {index} in cache")
+        print(f"[CACHE STATS] Control blocks: {len(_global_control_block_cache)}, Merkle paths: {len(_global_merkle_path_cache)}")
+        
+        return control_block_hex
 
     def __getitem__(self, index: int):
+        # Create a content-based cache key
+        cache_key = (
+            tuple(self.key_list),
+            tuple(self.signature_public_keys),
+            tuple(tuple(pk) for pk in self.public_keys),
+            tuple(self.trace_words_lengths),
+            self.bits_per_digit_checksum,
+            index
+        )
+        cache_key_str = f"script_{hash(cache_key)}"
+        
+        # Check global script cache
+        if not hasattr(self, '_script_cache'):
+            self._script_cache = {}
+        
+        if cache_key_str in self._script_cache:
+            print(f"[SCRIPT CACHE HIT] Script for index {index} retrieved from cache")
+            return self._script_cache[cache_key_str]
+        
+        print(f"[SCRIPT CACHE MISS] Generating script for index {index}")
+        
+        # Generate script
         execution_challenge_script_from_key_generator_service = (
             ExecutionChallengeScriptFromKeyGeneratorService()
         )
-        return execution_challenge_script_from_key_generator_service(
+        script = execution_challenge_script_from_key_generator_service(
             self.key_list[index],
             self.signature_public_keys,
             self.public_keys,
@@ -464,3 +411,9 @@ class BitVMXExecutionScriptList(BaseModel):
             self.opcode_dict,
             self.trace_to_script_mapping(),
         )
+        
+        # Cache the result
+        self._script_cache[cache_key_str] = script
+        print(f"[SCRIPT CACHE STORED] Script for index {index} cached")
+        
+        return script

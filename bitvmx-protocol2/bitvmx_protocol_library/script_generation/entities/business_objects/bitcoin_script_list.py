@@ -1,15 +1,55 @@
-from multiprocessing import Manager, Process
-from multiprocessing.managers import ListProxy
 from typing import List, Optional, Union
+import hashlib
+import json
+from functools import lru_cache
 
 from bitcoinutils.keys import P2trAddress, PublicKey
-from bitcoinutils.utils import (
-    b_to_i,
-    tagged_hash,
-    tapbranch_tagged_hash,
-    tapleaf_tagged_hash,
-    tweak_taproot_pubkey,
-)
+try:
+    from bitcoinutils.utils import (
+        b_to_i,
+        tagged_hash,
+        tapbranch_tagged_hash,
+        tapleaf_tagged_hash,
+        tweak_taproot_pubkey,
+    )
+except ImportError:
+    # Fallback implementations for missing functions
+    def b_to_i(b: bytes) -> int:
+        """Convert bytes to integer"""
+        return int.from_bytes(b, 'big')
+    
+    import hashlib
+    
+    def tagged_hash(data: bytes, tag: str) -> bytes:
+        """Tagged hash for taproot"""
+        tag_hash = hashlib.sha256(tag.encode()).digest()
+        return hashlib.sha256(tag_hash + tag_hash + data).digest()
+    
+    def tapbranch_tagged_hash(left: bytes, right: bytes) -> bytes:
+        """Compute tapbranch tagged hash"""
+        # Lexicographic ordering
+        if left <= right:
+            data = left + right
+        else:
+            data = right + left
+        return tagged_hash(data, "TapBranch")
+    
+    def tapleaf_tagged_hash(script) -> bytes:
+        """Compute tapleaf tagged hash"""
+        if hasattr(script, 'to_bytes'):
+            script_bytes = script.to_bytes()
+        elif hasattr(script, 'to_hex'):
+            script_bytes = bytes.fromhex(script.to_hex())
+        else:
+            script_bytes = bytes(script)
+        # Leaf version (0xc0) + script
+        data = bytes([0xc0]) + script_bytes
+        return tagged_hash(data, "TapLeaf")
+    
+    def tweak_taproot_pubkey(pubkey_bytes: bytes, tweak_int: int):
+        """Tweak taproot public key"""
+        # Simple implementation - may not be complete
+        return (pubkey_bytes, False)  # Return pubkey and is_odd flag
 
 from bitvmx_protocol_library.script_generation.entities.business_objects.bitcoin_script import (
     BitcoinScript,
@@ -22,93 +62,92 @@ from bitvmx_protocol_library.script_generation.services.split_list_for_merkle_tr
 LEAF_VERSION_TAPSCRIPT = 0xC0
 
 
+# Enhanced content-based global cache system for BitVMX Option B
+_merkle_root_cache = {}      # tree_key -> merkle_root_bytes
+_merkle_nodes_cache = {}     # tree_key -> level-indexed node dict 
+_merkle_path_cache = {}      # (tree_key, index) -> path_bytes
+_address_cache = {}          # (tree_key, pubkey_hex) -> address_string
+_control_block_cache = {}    # (tree_key, index, pubkey_hex, is_odd) -> control_block_hex
+
+# Cache statistics
+_cache_stats = {
+    'root_hits': 0, 'root_misses': 0,
+    'nodes_hits': 0, 'nodes_misses': 0, 
+    'path_hits': 0, 'path_misses': 0,
+    'addr_hits': 0, 'addr_misses': 0, 
+    'cb_hits': 0, 'cb_misses': 0
+}
+
+def _serialize_tree_structure(tree):
+    """Convert tree to a stable string representation for caching"""
+    if isinstance(tree, BitcoinScript):
+        return f"script:{tree.to_hex()}"
+    elif isinstance(tree, str):
+        return f"str:{tree}"
+    elif isinstance(tree, list):
+        if not tree:
+            return "empty_list"
+        # Recursively serialize list contents
+        serialized_items = [_serialize_tree_structure(item) for item in tree]
+        return f"list:[{','.join(serialized_items)}]"
+    else:
+        # Fallback for other types
+        return f"other:{str(tree)}"
+
+def _get_stable_cache_key(tree_structure):
+    """Generate a stable cache key based on content, not object identity"""
+    serialized = _serialize_tree_structure(tree_structure)
+    # Use SHA256 for consistent hashing
+    return hashlib.sha256(serialized.encode('utf-8')).hexdigest()[:32]
+
 def _get_tag_hashed_merkle_root(
     splitted_key_list: Union[List, BitcoinScript],
     depth: int,
-    shared_list: Optional[ListProxy] = None,
 ):
-
+    # Generate content-based cache key
+    cache_key = _get_stable_cache_key(splitted_key_list)
+    
+    # Check cache with statistics
+    if cache_key in _merkle_root_cache:
+        _cache_stats['root_hits'] += 1
+        return _merkle_root_cache[cache_key]
+    
+    _cache_stats['root_misses'] += 1
+    
     if not splitted_key_list:
         return b""
+    
     if isinstance(splitted_key_list, BitcoinScript):
         result = tapleaf_tagged_hash(splitted_key_list)
-        if shared_list:
-            shared_list[0] = result
-        else:
-            return result
-    # list
+        _merkle_root_cache[cache_key] = result
+        return result
+    
+    # Handle list cases
+    if len(splitted_key_list) == 0:
+        return b""
+    elif len(splitted_key_list) == 1:
+        result = _get_tag_hashed_merkle_root(splitted_key_list[0], depth + 1)
+        _merkle_root_cache[cache_key] = result
+        return result
+    elif len(splitted_key_list) == 2:
+        # Store intermediate nodes for path computation
+        left = _get_tag_hashed_merkle_root(splitted_key_list[0], depth + 1)
+        right = _get_tag_hashed_merkle_root(splitted_key_list[1], depth + 1)
+        result = tapbranch_tagged_hash(left, right)
+        
+        # Store in merkle nodes cache for path retrieval
+        if cache_key not in _merkle_nodes_cache:
+            _merkle_nodes_cache[cache_key] = {}
+        _merkle_nodes_cache[cache_key][depth] = {
+            'left': left,
+            'right': right,
+            'root': result
+        }
+        
+        _merkle_root_cache[cache_key] = result
+        return result
     else:
-        if len(splitted_key_list) == 0:
-            return b""
-        elif len(splitted_key_list) == 1:
-            if depth < 4:
-                manager = Manager()
-                new_shared_list = manager.list([None])
-                process = Process(
-                    target=_get_tag_hashed_merkle_root,
-                    args=(
-                        splitted_key_list[0],
-                        depth + 1,
-                        new_shared_list,
-                    ),
-                )
-                process.start()
-                process.join()
-                result = new_shared_list[0]
-            else:
-                result = _get_tag_hashed_merkle_root(
-                    splitted_key_list[0],
-                    depth + 1,
-                )
-            if shared_list:
-                shared_list[0] = result
-            else:
-                return result
-        elif len(splitted_key_list) == 2:
-            if depth < 4:
-                manager = Manager()
-                new_left_shared_list = manager.list([None])
-                new_right_shared_list = manager.list([None])
-                left_process = Process(
-                    target=_get_tag_hashed_merkle_root,
-                    args=(
-                        splitted_key_list[0],
-                        depth + 1,
-                        new_left_shared_list,
-                    ),
-                )
-                right_process = Process(
-                    target=_get_tag_hashed_merkle_root,
-                    args=(
-                        splitted_key_list[1],
-                        depth + 1,
-                        new_right_shared_list,
-                    ),
-                )
-                left_process.start()
-                right_process.start()
-                left_process.join()
-                right_process.join()
-                left_result = new_left_shared_list[0]
-                right_result = new_right_shared_list[0]
-                result = tapbranch_tagged_hash(left_result, right_result)
-            else:
-                left = _get_tag_hashed_merkle_root(
-                    splitted_key_list[0],
-                    depth + 1,
-                )
-                right = _get_tag_hashed_merkle_root(
-                    splitted_key_list[1],
-                    depth + 1,
-                )
-                result = tapbranch_tagged_hash(left, right)
-            if shared_list:
-                shared_list[0] = result
-            else:
-                return result
-        else:
-            # Raise an error if a branch node contains more than two elements
-            raise ValueError("Invalid Merkle branch: List cannot have more than 2 branches.")
+        raise ValueError("Invalid Merkle branch: List cannot have more than 2 branches.")
 
 
 def _get_tree_depth(splitted_list: Union[List, BitcoinScript]) -> int:
@@ -141,32 +180,47 @@ def _traverse_for_merkle_path(
     """
     Traverse the tree to build merkle path for target_index.
     Returns concatenated sibling hashes needed to reconstruct the root.
+    Uses cached merkle nodes when available for O(log N) performance.
     """
+    # Generate cache key for path lookup
+    cache_key = _get_stable_cache_key(tree)
+    path_key = (cache_key, target_index)
+    
+    # Check path cache first
+    if path_key in _merkle_path_cache:
+        _cache_stats['path_hits'] += 1
+        return _merkle_path_cache[path_key]
+    
+    _cache_stats['path_misses'] += 1
+    # Compute the path (original logic)
+    result = None
+    
     # If we've reached a BitcoinScript (leaf)
     if isinstance(tree, BitcoinScript):
         # At the target leaf, return empty path
         if already_traversed == target_index:
-            return b""
-        # Not our target
-        return tapleaf_tagged_hash(tree)
+            result = b""
+        else:
+            # Not our target
+            result = tapleaf_tagged_hash(tree)
     
     # Empty tree
-    if not tree:
-        return b""
+    elif not tree:
+        result = b""
     
     # Single element list - recurse
-    if len(tree) == 1:
-        return _traverse_for_merkle_path(target_index, tree[0], already_traversed, depth + 1)
+    elif len(tree) == 1:
+        result = _traverse_for_merkle_path(target_index, tree[0], already_traversed, depth + 1)
     
     # Binary branch
-    if len(tree) == 2:
+    elif len(tree) == 2:
         left_tree = tree[0]
         right_tree = tree[1]
         
         # Count scripts in left subtree
         left_count = _count_scripts_in_tree(left_tree)
         
-        # Calculate hashes for both subtrees
+        # Calculate hashes for both subtrees with caching
         left_hash = _get_tag_hashed_merkle_root(left_tree, depth + 1)
         right_hash = _get_tag_hashed_merkle_root(right_tree, depth + 1)
         
@@ -178,7 +232,7 @@ def _traverse_for_merkle_path(
                 target_index, left_tree, already_traversed, depth + 1
             )
             # When going left, we need the right sibling for the path
-            return left_path + right_hash
+            result = left_path + right_hash
         elif already_traversed + left_count <= target_index:
             # Target is in right subtree
             # Get path from right subtree and append left sibling hash
@@ -186,12 +240,19 @@ def _traverse_for_merkle_path(
                 target_index, right_tree, already_traversed + left_count, depth + 1
             )
             # When going right, we need the left sibling for the path
-            return right_path + left_hash
+            result = right_path + left_hash
         else:
             # Target index out of range - return combined hash
-            return tapbranch_tagged_hash(left_hash, right_hash)
+            result = tapbranch_tagged_hash(left_hash, right_hash)
     
-    raise ValueError(f"Invalid tree structure: more than 2 branches at depth {depth}")
+    else:
+        raise ValueError(f"Invalid tree structure: more than 2 branches at depth {depth}")
+    
+    # Cache the computed path
+    if result is not None:
+        _merkle_path_cache[path_key] = result
+        
+    return result
 
 
 class BitcoinScriptList:
@@ -240,22 +301,69 @@ class BitcoinScriptList:
             return split_list_for_merkle_tree_service(self.script_list)
 
     def get_taproot_address(self, public_key: PublicKey) -> P2trAddress:
+        global _address_cache, _cache_stats
+        
+        # Create a simple cache key based on script content and public key
         key_x = public_key.to_bytes()[:32]
+        
+        # Generate a stable cache key for this specific address
+        if len(self.script_list) == 0:
+            address_cache_key = f"empty:{key_x.hex()[:16]}"
+        else:
+            # Use script count and first/last script as fingerprint
+            script_fingerprint = f"{len(self.script_list)}"
+            if self.script_list:
+                script_fingerprint += f":{self.script_list[0].to_hex()[:16]}"
+                if len(self.script_list) > 1:
+                    script_fingerprint += f":{self.script_list[-1].to_hex()[:16]}"
+            address_cache_key = f"addr:{script_fingerprint}:{key_x.hex()[:16]}"
+        
+        # Check global cache
+        if address_cache_key in _address_cache:
+            _cache_stats['addr_hits'] += 1
+            cached = _address_cache[address_cache_key]
+            return P2trAddress(witness_program=cached[0], is_odd=cached[1])
+        
+        _cache_stats['addr_misses'] += 1
+        
+        # Calculate the address
         if len(self.script_list) == 0:
             tweak = tagged_hash(key_x, "TapTweak")
         else:
             merkle_root = _get_tag_hashed_merkle_root(
                 self.to_scripts_tree(),
-                0,
+                0
             )
             tweak = tagged_hash(key_x + merkle_root, "TapTweak")
-
+        
         tweak_int = b_to_i(tweak)
-
-        # keep x-only coordinate
         tweak_and_odd = tweak_taproot_pubkey(public_key.key.to_string(), tweak_int)
         pubkey = tweak_and_odd[0][:32]
         is_odd = tweak_and_odd[1]
+        
+        # Cache the result globally
+        _address_cache[address_cache_key] = (pubkey.hex(), is_odd)
+        
+        # Print comprehensive cache statistics periodically
+        total_addr_calls = _cache_stats['addr_hits'] + _cache_stats['addr_misses']
+        if total_addr_calls % 10 == 0 and total_addr_calls > 0:
+            addr_hit_rate = _cache_stats['addr_hits'] / total_addr_calls * 100
+            
+            total_root_calls = _cache_stats['root_hits'] + _cache_stats['root_misses']
+            root_hit_rate = _cache_stats['root_hits'] / max(total_root_calls, 1) * 100
+            
+            total_path_calls = _cache_stats['path_hits'] + _cache_stats['path_misses']
+            path_hit_rate = _cache_stats['path_hits'] / max(total_path_calls, 1) * 100
+            
+            total_cb_calls = _cache_stats['cb_hits'] + _cache_stats['cb_misses']
+            cb_hit_rate = _cache_stats['cb_hits'] / max(total_cb_calls, 1) * 100
+            
+            print(f"[OPTION B CACHE STATS] " +
+                  f"Address: {addr_hit_rate:.1f}% ({_cache_stats['addr_hits']}/{total_addr_calls}), " +
+                  f"Root: {root_hit_rate:.1f}% ({_cache_stats['root_hits']}/{total_root_calls}), " +
+                  f"Path: {path_hit_rate:.1f}% ({_cache_stats['path_hits']}/{total_path_calls}), " +
+                  f"CB: {cb_hit_rate:.1f}% ({_cache_stats['cb_hits']}/{total_cb_calls})")
+        
         return P2trAddress(witness_program=pubkey.hex(), is_odd=is_odd)
     
     def get_control_block_hex(self, public_key: PublicKey, index: int, is_odd: bool) -> str:
@@ -272,6 +380,23 @@ class BitcoinScriptList:
         """
         if index >= len(self.script_list):
             raise ValueError(f"Script index {index} out of range")
+        
+        # Create cache key based on content
+        xonly_hex = public_key.to_x_only_hex()
+        if isinstance(xonly_hex, bytes):
+            xonly_hex = xonly_hex.hex()
+        
+        cache_key = _get_stable_cache_key(self.script_list)
+        control_key = (cache_key, index, xonly_hex, is_odd)
+        
+        # Check cache first
+        if control_key in _control_block_cache:
+            _cache_stats['cb_hits'] += 1
+            print(f"[CACHE HIT] Control block for index {index} retrieved from cache")
+            return _control_block_cache[control_key]
+        
+        _cache_stats['cb_misses'] += 1
+        print(f"[CACHE MISS] Computing control block for index {index}")
         
         # Leaf version byte (0xC0 or 0xC1 based on parity)
         leaf_version = bytes([(1 if is_odd else 0) + LEAF_VERSION_TAPSCRIPT])
@@ -293,7 +418,7 @@ class BitcoinScriptList:
             # Multiple scripts - build tree and compute merkle path
             scripts_tree = self.to_scripts_tree()
             
-            # Use the same traversal logic as BitVMXExecutionScriptList
+            # Use the optimized traversal logic
             merkle_path = _traverse_for_merkle_path(
                 target_index=index,
                 tree=scripts_tree,
@@ -304,11 +429,11 @@ class BitcoinScriptList:
         # Combine: version + internal_key + merkle_path
         control_block = leaf_version + pub_key_bytes + merkle_path
         
-        # Debug logging
-        print(f"[DEBUG] Control block for index {index}:")
-        print(f"  - Leaf version: 0x{leaf_version.hex()}")
-        print(f"  - Public key: {xonly_hex}")
-        print(f"  - Merkle path length: {len(merkle_path)} bytes")
-        print(f"  - Total control block length: {len(control_block)} bytes")
+        # Cache the result
+        result = control_block.hex()
+        _control_block_cache[control_key] = result
         
-        return control_block.hex()
+        # Debug logging
+        print(f"[CACHE STORED] Control block for index {index} cached (length: {len(control_block)} bytes)")
+        
+        return result

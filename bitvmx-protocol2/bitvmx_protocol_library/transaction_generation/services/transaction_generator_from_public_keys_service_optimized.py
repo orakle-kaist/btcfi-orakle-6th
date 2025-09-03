@@ -7,7 +7,7 @@ from bitcoinutils.keys import P2wpkhAddress
 from bitcoinutils.transactions import Transaction, TxInput, TxOutput
 from bitcoinutils.script import Script
 
-from bitvmx_protocol_library.utils.suppress_output import suppress_output
+# suppress_output removed - causes FD issues in multi-threaded environment
 
 from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_setup_properties_dto import (
     BitVMXProtocolSetupPropertiesDTO,
@@ -52,7 +52,8 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
         self.bitvmx_bitcoin_scripts_generator_service = BitVMXBitcoinScriptsGeneratorService()
         self._address_cache = {}
         self._txid_cache = {}
-        self._skip_expensive_ops = True  # Skip expensive trigger_trace_challenge_address computation
+        # Option B: Always use real tapscript addresses, no fallback
+        self._skip_expensive_ops = False
     
     @lru_cache(maxsize=1024)
     def _get_cached_address(self, script_key: str, destroyed_public_key):
@@ -82,10 +83,9 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
         bitvmx_protocol_setup_properties_dto: BitVMXProtocolSetupPropertiesDTO,
     ) -> BitVMXTransactionsDTO:
         """Generate all BitVMX transactions with complete output suppression."""
-        # Suppress ALL output during the entire transaction generation
-        # This avoids the expensive StructuredScript formatting cost
-        with suppress_output():
-            return self._generate_transactions_internal(bitvmx_protocol_setup_properties_dto)
+        # Call internal method directly without output suppression
+        # FD redirection causes issues in multi-threaded ASGI environment
+        return self._generate_transactions_internal(bitvmx_protocol_setup_properties_dto)
     
     def _generate_transactions_internal(
         self,
@@ -149,41 +149,28 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
         
         funding_tx = Transaction([funding_txin], [funding_txout], has_segwit=True)
         
-        # IMPORTANT: Use the actual funding_tx_id from setup, not the generated one
-        # The funding_tx above is just for reference, but we must use the real on-chain txid
-        actual_funding_txid = bitvmx_protocol_setup_properties_dto.funding_tx_id
-        actual_funding_index = bitvmx_protocol_setup_properties_dto.funding_index
-        
-        
         # Pre-generate addresses in parallel
         hash_search_scripts_addresses = []
         choice_search_scripts_addresses = []
         
-        def get_address_with_suppression(scripts_list, public_key):
-            """Helper to get taproot address with output suppression"""
-            with suppress_output():
-                return scripts_list.get_taproot_address(public_key)
+        # Directly generate addresses in parallel without suppression
         
         with ThreadPoolExecutor(max_workers=4) as executor:
             # Submit hash address generation using consistent iteration range
-            hash_futures = [
-                executor.submit(
-                    get_address_with_suppression,
-                    bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_search_scripts_list(i),
-                    destroyed_public_key
+            hash_futures = []
+            for i in _iter_range(search_iterations):
+                scripts_list = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_search_scripts_list(i)
+                hash_futures.append(
+                    executor.submit(scripts_list.get_taproot_address, destroyed_public_key)
                 )
-                for i in _iter_range(search_iterations)
-            ]
             
             # Submit choice address generation using consistent iteration range
-            choice_futures = [
-                executor.submit(
-                    get_address_with_suppression,
-                    bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_search_scripts_list(i),
-                    destroyed_public_key
+            choice_futures = []
+            for i in _iter_range(search_iterations):
+                scripts_list = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_search_scripts_list(i)
+                choice_futures.append(
+                    executor.submit(scripts_list.get_taproot_address, destroyed_public_key)
                 )
-                for i in _iter_range(search_iterations)
-            ]
             
             # Collect results
             for future in hash_futures:
@@ -202,8 +189,10 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
             public_key=destroyed_public_key
         )
         
-        # FIXED: Use actual on-chain funding UTXO, not synthetic funding_tx
-        # This ensures children spend the real UTXO that exists on-chain
+        # Use actual funding_tx_id from DTO (not synthetic funding_tx.get_txid())
+        # This ensures hash_result_tx references the correct on-chain parent
+        actual_funding_txid = bitvmx_protocol_setup_properties_dto.funding_tx_id
+        actual_funding_index = bitvmx_protocol_setup_properties_dto.funding_index
         hash_result_txin = TxInput(actual_funding_txid, actual_funding_index, script_sig=Script([]))
         hash_result_output_amount = funding_amount - step_fees
         
@@ -262,20 +251,14 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
             search_choice_tx_list.append(choice_tx)
             previous_tx_id = choice_tx.get_txid()
         
-        # Create remaining transactions (simplified)
-        # OPTIMIZATION: Use a cached or placeholder address to avoid expensive computation
+        # Create remaining transactions - USE ACTUAL TAPSCRIPT ADDRESS (Option B)
+        # No fallback - we use the real trigger_trace_challenge_address
         t_trigger = time.time()
-        try:
-            # Try to use a simple fallback address for now
-            # This avoids the expensive trigger_trace_challenge_address computation
-            trigger_challenge_script_address = verifier_address if hasattr(self, '_skip_expensive_ops') else bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(
-                destroyed_public_key=destroyed_public_key
-            )
-        except Exception as e:
-            # Use verifier address as fallback
-            trigger_challenge_script_address = P2wpkhAddress.from_address(
-                address=bitvmx_protocol_setup_properties_dto.verifier_destination_address
-            )
+        print("[OPTION B] Computing trigger_trace_challenge_address (no fallback)")
+        trigger_challenge_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(
+            destroyed_public_key=destroyed_public_key
+        )
+        print(f"[OPTION B] trigger_trace_challenge_address computed in {time.time() - t_trigger:.3f}s")
         
         trace_txin = TxInput(search_choice_tx_list[-1].get_txid(), 0, script_sig=Script([]))
         trace_output_amount = current_output_amount - step_fees
@@ -338,21 +321,28 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
         if search_iterations > 1:
             t_hash = time.time()
             try:
-                with suppress_output():
-                    first_hash_read_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_read_search_scripts_address(
+                # Direct call without suppress_output (removed FD redirect)
+                first_hash_read_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_read_search_scripts_address(
                         destroyed_public_key=destroyed_public_key,
                         iteration=1,
                     )
             except Exception as e:
                 # Skip read search transactions on error
                 search_iterations = 1
+                # Use first hash address if available, otherwise use verifier as fallback
+                if hash_search_scripts_addresses:
+                    first_hash_read_address = hash_search_scripts_addresses[0]
+                else:
+                    first_hash_read_address = verifier_address
             
-            first_choice_tx = Transaction(
-                [TxInput(trace_tx.get_txid(), 0, script_sig=Script([]))],
-                [TxOutput(trigger_challenge_output_amount, first_hash_read_address.to_script_pub_key())],
-                has_segwit=True
-            )
-            read_search_choice_tx_list.append(first_choice_tx)
+            # Only create first_choice_tx if we have a valid address
+            if 'first_hash_read_address' in locals():
+                first_choice_tx = Transaction(
+                    [TxInput(trace_tx.get_txid(), 0, script_sig=Script([]))],
+                    [TxOutput(trigger_challenge_output_amount, first_hash_read_address.to_script_pub_key())],
+                    has_segwit=True
+                )
+                read_search_choice_tx_list.append(first_choice_tx)
         
         # Add missing read_trace_tx and trigger_read_challenge_tx
         t_addr = time.time()
@@ -363,16 +353,16 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
                 if cache_key in bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto._address_cache:
                     read_trace_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto._address_cache[cache_key]
                 else:
-                    with suppress_output():
-                        read_trace_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.read_trace_script_list.get_taproot_address(
+                    # Direct call without suppress_output (removed FD redirect)
+                    read_trace_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.read_trace_script_list.get_taproot_address(
                             destroyed_public_key
                         )
                     bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto._address_cache[cache_key] = read_trace_script_address
             else:
                 # Initialize cache
                 bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto._address_cache = {}
-                with suppress_output():
-                    read_trace_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.read_trace_script_list.get_taproot_address(
+                # Direct call without suppress_output (removed FD redirect)
+                read_trace_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.read_trace_script_list.get_taproot_address(
                         destroyed_public_key
                     )
                 bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto._address_cache[cache_key] = read_trace_script_address

@@ -1,5 +1,6 @@
 import json
-from typing import Dict, List
+import hashlib
+from typing import Dict, List, Optional
 
 from bitcoinutils.keys import P2trAddress, PublicKey
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
@@ -48,6 +49,16 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
     choice_read_search_scripts: List[BitcoinScript]
     trigger_read_search_equivocation_scripts: List[BitcoinScript]
     read_trace_script: BitcoinScript
+    
+    # Fixed script trees (generated once and cached)
+    trigger_trace_challenge_scripts_list_fixed: Optional[BitcoinScriptList] = Field(default=None, exclude=True)
+    trigger_read_challenge_scripts_list_fixed: Optional[BitcoinScriptList] = Field(default=None, exclude=True)
+    trace_script_list_fixed: Optional[BitcoinScriptList] = Field(default=None, exclude=True)
+    read_trace_script_list_fixed: Optional[BitcoinScriptList] = Field(default=None, exclude=True)
+    trigger_protocol_scripts_list_fixed: Optional[BitcoinScriptList] = Field(default=None, exclude=True)
+    
+    # Tree fingerprint for cache key generation and debugging
+    tree_fingerprint: Optional[str] = Field(default=None, exclude=True)
     trigger_wrong_trace_step_script: BitcoinScript
     trigger_wrong_read_trace_step_script: BitcoinScript
     trigger_read_wrong_hash_challenge_scripts: BitVMXWrongHashScriptList
@@ -65,13 +76,17 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
 
     def __init__(self, **data):
         for field_name, field_type in self.__annotations__.items():
+            # Skip fixed fields and special fields during deserialization
+            if field_name.endswith('_fixed') or field_name == 'tree_fingerprint':
+                continue
+                
             if field_type == BitcoinScript:
-                if not isinstance(data[field_name], BitcoinScript):
+                if field_name in data and not isinstance(data[field_name], BitcoinScript):
                     data[field_name] = BitcoinScript(json.loads(data[field_name]))
             elif field_type == List[BitcoinScript]:
-                if not isinstance(data[field_name], list) or not all(
+                if field_name in data and (not isinstance(data[field_name], list) or not all(
                     isinstance(item, BitcoinScript) for item in data[field_name]
-                ):
+                )):
                     data[field_name] = list(
                         map(
                             lambda elem: BitcoinScript(json.loads(elem)),
@@ -79,7 +94,7 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
                         )
                     )
             elif field_type == BitcoinScriptList:
-                if not isinstance(data[field_name], BitcoinScriptList):
+                if field_name in data and not isinstance(data[field_name], BitcoinScriptList):
                     data[field_name] = BitcoinScriptList(
                         list(
                             map(
@@ -89,22 +104,89 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
                         )
                     )
             elif field_type == BitVMXExecutionScriptList:
-                if not isinstance(data[field_name], BitVMXExecutionScriptList):
+                if field_name in data and not isinstance(data[field_name], BitVMXExecutionScriptList):
                     data[field_name] = BitVMXExecutionScriptList(**data[field_name])
             elif field_type == BitVMXWrongHashScriptList:
-                if not isinstance(data[field_name], BitVMXWrongHashScriptList):
+                if field_name in data and not isinstance(data[field_name], BitVMXWrongHashScriptList):
                     data[field_name] = BitVMXWrongHashScriptList(**data[field_name])
             elif field_type == BitVMXWrongProgramCounterScriptList:
-                if not isinstance(data[field_name], BitVMXWrongProgramCounterScriptList):
+                if field_name in data and not isinstance(data[field_name], BitVMXWrongProgramCounterScriptList):
                     data[field_name] = BitVMXWrongProgramCounterScriptList(**data[field_name])
             elif field_type == BitVMXLastHashEquivocationScriptList:
-                if not isinstance(data[field_name], BitVMXLastHashEquivocationScriptList):
+                if field_name in data and not isinstance(data[field_name], BitVMXLastHashEquivocationScriptList):
                     data[field_name] = BitVMXLastHashEquivocationScriptList(**data[field_name])
             elif field_type == Dict[str, str]:
                 pass
+            elif field_type.__origin__ == Optional:
+                pass  # Skip Optional fields
             else:
-                raise TypeError(f"Unexpected type {field_type} for field {field_name}")
+                if field_name in data:
+                    raise TypeError(f"Unexpected type {field_type} for field {field_name}")
+        
         super().__init__(**data)
+        
+        # Generate fixed script trees once during initialization
+        self._initialize_fixed_script_trees()
+
+    def _initialize_fixed_script_trees(self):
+        """Initialize fixed script trees once during DTO creation to ensure cache consistency"""
+        print("[DTO] Initializing fixed script trees...")
+        
+        # Generate trigger_trace_challenge_scripts_list_fixed (most critical for performance)
+        self.trigger_trace_challenge_scripts_list_fixed = (
+            self.trigger_challenge_scripts
+            + self.wrong_hash_challenge_script_list.script_list()
+            + self.wrong_program_counter_challenge_scripts_list.script_list()
+            + BitcoinScriptList([self.choice_read_search_scripts[0]])
+            + self.input_1_equivocation_challenge_scripts
+            + self.input_2_equivocation_challenge_scripts
+            + self.constants_1_equivocation_challenge_scripts
+            + self.constants_2_equivocation_challenge_scripts
+            + BitcoinScriptList([self.trigger_wrong_halt_step_challenge_script])
+            + BitcoinScriptList([self.trigger_no_halt_in_halt_step_challenge_script])
+            + self.last_hash_equivocation_script_list.script_list()
+            + BitcoinScriptList([self.wrong_init_value_1_challenge_script])
+            + BitcoinScriptList([self.wrong_init_value_2_challenge_script])
+            + BitcoinScriptList([self.prover_timeout_script])
+        )
+        
+        # Generate trigger_read_challenge_scripts_list_fixed
+        self.trigger_read_challenge_scripts_list_fixed = (
+            BitcoinScriptList(self.trigger_read_search_equivocation_scripts)
+            + BitcoinScriptList([self.trigger_wrong_trace_step_script])
+            + BitcoinScriptList([self.trigger_wrong_read_trace_step_script])
+            + self.trigger_read_wrong_hash_challenge_scripts.script_list()
+            + BitcoinScriptList([self.trigger_wrong_value_address_read_1_challenge_script])
+            + BitcoinScriptList([self.trigger_wrong_value_address_read_2_challenge_script])
+            + BitcoinScriptList([self.trigger_wrong_latter_step_1_challenge_script])
+            + BitcoinScriptList([self.trigger_wrong_latter_step_2_challenge_script])
+            + BitcoinScriptList([self.verifier_timeout_script])
+        )
+        
+        # Generate other fixed lists for completeness
+        self.trace_script_list_fixed = self.execution_challenge_script_list
+        self.read_trace_script_list_fixed = BitcoinScriptList([self.read_trace_script, self.verifier_timeout_script])
+        self.trigger_protocol_scripts_list_fixed = BitcoinScriptList([self.trigger_protocol_script, self.verifier_timeout_script])
+        
+        # Generate tree fingerprint for cache key and debugging
+        self._generate_tree_fingerprint()
+        
+        print(f"[DTO] Fixed script trees initialized with fingerprint: {self.tree_fingerprint}")
+    
+    def _generate_tree_fingerprint(self):
+        """Generate unique fingerprint for this script tree configuration"""
+        # Serialize key components that affect tree structure
+        components = []
+        
+        if self.trigger_trace_challenge_scripts_list_fixed:
+            components.append(f"ttc:{len(self.trigger_trace_challenge_scripts_list_fixed.script_list)}")
+        if self.trigger_read_challenge_scripts_list_fixed:
+            components.append(f"trc:{len(self.trigger_read_challenge_scripts_list_fixed.script_list)}")
+        if self.trace_script_list_fixed:
+            components.append(f"trace:{len(self.trace_script_list_fixed.key_list)}")
+        
+        combined = ":".join(components)
+        self.tree_fingerprint = hashlib.sha256(combined.encode()).hexdigest()[:32]
 
     def hash_search_scripts_list(self, iteration: int) -> BitcoinScriptList:
         return BitcoinScriptList([self.hash_search_scripts[iteration], self.prover_timeout_script])
@@ -133,26 +215,17 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
 
     @property
     def trigger_trace_challenge_scripts_list(self) -> BitcoinScriptList:
-        return (
-            self.trigger_challenge_scripts
-            + self.wrong_hash_challenge_script_list.script_list()
-            + self.wrong_program_counter_challenge_scripts_list.script_list()
-            + BitcoinScriptList(self.choice_read_search_scripts[0])
-            + self.input_1_equivocation_challenge_scripts
-            + self.input_2_equivocation_challenge_scripts
-            + self.constants_1_equivocation_challenge_scripts
-            + self.constants_2_equivocation_challenge_scripts
-            + BitcoinScriptList(self.trigger_wrong_halt_step_challenge_script)
-            + BitcoinScriptList(self.trigger_no_halt_in_halt_step_challenge_script)
-            + self.last_hash_equivocation_script_list.script_list()
-            + self.wrong_init_value_1_challenge_script
-            + self.wrong_init_value_2_challenge_script
-            + self.verifier_timeout_script
-        )
+        """Return the fixed script list - no more dynamic generation"""
+        if self.trigger_trace_challenge_scripts_list_fixed is None:
+            raise ValueError("Fixed script trees not initialized. Call _initialize_fixed_script_trees() first.")
+        return self.trigger_trace_challenge_scripts_list_fixed
 
     @property
     def trigger_protocol_scripts_list(self) -> BitcoinScriptList:
-        return BitcoinScriptList([self.trigger_protocol_script, self.verifier_timeout_script])
+        """Return the fixed script list - no more dynamic generation"""
+        if self.trigger_protocol_scripts_list_fixed is None:
+            raise ValueError("Fixed script trees not initialized. Call _initialize_fixed_script_trees() first.")
+        return self.trigger_protocol_scripts_list_fixed
 
     @staticmethod
     def trigger_protocol_index() -> int:
@@ -160,9 +233,10 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
 
     @property
     def trace_script_list(self) -> BitcoinScriptList:
-        return BitcoinScriptList(
-            [self.trace_script, self.trigger_wrong_trace_step_script, self.prover_timeout_script]
-        )
+        """Return the fixed script list - no more dynamic generation"""
+        if self.trace_script_list_fixed is None:
+            raise ValueError("Fixed script trees not initialized. Call _initialize_fixed_script_trees() first.")
+        return self.trace_script_list_fixed
 
     @staticmethod
     def trace_script_index() -> int:
@@ -174,13 +248,10 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
 
     @property
     def read_trace_script_list(self) -> BitcoinScriptList:
-        return BitcoinScriptList(
-            [
-                self.read_trace_script,
-                self.trigger_wrong_read_trace_step_script,
-                self.prover_timeout_script,
-            ]
-        )
+        """Return the fixed script list - no more dynamic generation"""
+        if self.read_trace_script_list_fixed is None:
+            raise ValueError("Fixed script trees not initialized. Call _initialize_fixed_script_trees() first.")
+        return self.read_trace_script_list_fixed
 
     @staticmethod
     def read_trace_script_index() -> int:
@@ -207,14 +278,10 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
 
     @property
     def trigger_read_challenge_scripts_list(self) -> BitcoinScriptList:
-        return (
-            self.trigger_read_wrong_hash_challenge_scripts.script_list()
-            + self.trigger_wrong_value_address_read_1_challenge_script
-            + self.trigger_wrong_value_address_read_2_challenge_script
-            + self.trigger_wrong_latter_step_1_challenge_script
-            + self.trigger_wrong_latter_step_2_challenge_script
-            + self.verifier_timeout_script
-        )
+        """Return the fixed script list - no more dynamic generation"""
+        if self.trigger_read_challenge_scripts_list_fixed is None:
+            raise ValueError("Fixed script trees not initialized. Call _initialize_fixed_script_trees() first.")
+        return self.trigger_read_challenge_scripts_list_fixed
 
     def trigger_read_challenge_address(self, destroyed_public_key: PublicKey) -> P2trAddress:
         if destroyed_public_key.to_hex() in self.cached_trigger_read_challenge_address:
