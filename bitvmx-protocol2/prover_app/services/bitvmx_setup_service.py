@@ -81,12 +81,13 @@ class FundingSource:
 class BitvmxSetupService:
     """Service for creating and managing BitVMX setups for options"""
     
-    def __init__(self, base_dir: str = "prover_files"):
+    def __init__(self, base_dir: str = "prover_files", elf_file_name: str = None):
         self.base_dir = base_dir
         self.persistence = DTOPersistenceServiceOptimized(base_dir)
-        self.scripts_generator = BitVMXBitcoinScriptsGeneratorService()
+        self.scripts_generator = BitVMXBitcoinScriptsGeneratorService(elf_file_name=elf_file_name)
         self.tx_generator = TransactionGeneratorFromPublicKeysServiceOptimized()
         self.signature_service = GenerateSignaturesService()
+        self.elf_file_name = elf_file_name
         self.apply_signatures_service = ApplySignaturesToTransactionsService()
         
         # Default protocol parameters (optimized for options)

@@ -9,7 +9,6 @@ from bitcoinutils.keys import P2wpkhAddress, PrivateKey, PublicKey
 from bitcoinutils.transactions import Transaction, TxInput, TxOutput, TxWitnessInput
 from bitcoinutils.script import Script
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_setup_properties_dto import (
     BitVMXProtocolSetupPropertiesDTO,
@@ -132,10 +131,9 @@ class BitVMXNativePresignService:
         
         # 4. Pre-sign 서명 생성 (BitVMX 방식)
         
-        # Control block 생성
-        control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=settlement_scripts_list.to_scripts_tree(),
+        # Control block은 우리가 계산한 hex를 직접 사용 (라이브러리 재계산 방지)
+        control_block_hex = settlement_scripts_list.get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=0,
             is_odd=settlement_address.is_odd(),
         )
@@ -187,7 +185,7 @@ class BitVMXNativePresignService:
                         # [oracle_price, merkle_proof, ...]
                         itm_signature,
                         settlement_script.to_hex(),
-                        control_block.to_hex(),
+                        control_block_hex,
                     ]
                 },
                 "settlement_tx_otm": {
@@ -197,12 +195,12 @@ class BitVMXNativePresignService:
                         # Oracle price proof will be added here
                         otm_signature,
                         settlement_script.to_hex(),
-                        control_block.to_hex(),
+                        control_block_hex,
                     ]
                 }
             },
             "settlement_script": settlement_script.to_hex(),
-            "control_block": control_block.to_hex(),
+            "control_block": control_block_hex,
         }
         
         return presign_graph

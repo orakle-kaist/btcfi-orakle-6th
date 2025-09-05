@@ -1,0 +1,21 @@
+{
+  "n0": "95345231311686206430232499519858732875112815172388346040832798510409784455583",
+  "n1": "45304209169302437332827219653684842254416941149093254634764501690524942413436",
+  "prover_public_key": "83ceccaab5bee2f4842744a26037641041757a81a674cdec0143bb4954425bf8",
+  "input_hex": "00000000404b4c00",
+  "max_amount_of_steps": 16,
+  "funding_tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+  "funding_index": 0,
+  "funding_amount": 10000000,
+  "step_fees": 7000,
+  "amount_of_bits_wrong_step_search": 2,
+  "amount_of_bits_per_digit_checksum": 4,
+  "secret_origin_of_funds": "04dd997ee608b8fcef617036d0113604e24308704d3dbb6f18952832dacd5469",
+  "prover_destination_address": "tb1qt8rdur557nz338g3lekc6458pj0dl63c0s9904",
+  "prover_signature_private_key": "f782eed3dbb10d7912a83970484496c023c11b64d78fae474018ece516db60ca",
+  "prover_signature_public_key": "0279436c9477bc0a982ad9751e25b5851b91450b40113f548e22704744d7fe8c79",
+  "elf_file_name": "option_registration_final.elf",
+  "amount_of_input_words": 2,
+  "verifier_destination_address": "tb1q8fg5jrspc7fn8jvpe5tfr7e5dlwvsh6xw8cq4j",
+  "timeout_seconds": 600
+}

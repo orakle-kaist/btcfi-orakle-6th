@@ -1,7 +1,6 @@
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
 from bitcoinutils.keys import PrivateKey
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_setup_properties_dto import (
     BitVMXProtocolSetupPropertiesDTO,
@@ -43,16 +42,11 @@ class TriggerWrongHashChallengeTransactionService:
         bitvmx_protocol_verifier_dto: BitVMXProtocolVerifierDTO,
     ):
 
-        trigger_challenge_taptree = (
-            bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_challenge_taptree()
+        trigger_challenge_scripts_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_scripts_list.get_taproot_address(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
-        trigger_challenge_scripts_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(
-            destroyed_public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key
-        )
-
-        wrong_hash_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=trigger_challenge_taptree,
+        wrong_hash_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_scripts_list.get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_wrong_hash_challenge_index(
                 choice=bitvmx_protocol_verifier_dto.first_wrong_step
             ),
@@ -120,7 +114,7 @@ class TriggerWrongHashChallengeTransactionService:
                 + trigger_execution_challenge_signature
                 + [
                     current_script.to_hex(),
-                    wrong_hash_control_block.to_hex(),
+                    wrong_hash_control_block_hex,
                 ]
             )
         )

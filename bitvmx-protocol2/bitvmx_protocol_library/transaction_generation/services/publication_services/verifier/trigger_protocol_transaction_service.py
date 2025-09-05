@@ -1,7 +1,6 @@
 from typing import List, Optional
 
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 from pydantic import BaseModel
 
 from bitvmx_protocol_library.bitvmx_execution.services.execution_trace_generation_service import (
@@ -157,9 +156,9 @@ class TriggerProtocolTransactionService:
                 current_index
             ]
 
-            trigger_protocol_control_block = ControlBlock(
-                bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-                scripts=trigger_protocol_taptree,
+            # Use cached/control-block hex from script list to avoid recomputation
+            trigger_protocol_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_protocol_scripts_list.get_control_block_hex(
+                public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
                 index=current_index,
                 is_odd=trigger_protocol_script_address.is_odd(),
             )
@@ -188,7 +187,7 @@ class TriggerProtocolTransactionService:
                     + trigger_protocol_signatures
                     + [
                         current_script.to_hex(),
-                        trigger_protocol_control_block.to_hex(),
+                        trigger_protocol_control_block_hex,
                     ]
                 )
             )

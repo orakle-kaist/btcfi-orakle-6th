@@ -7,11 +7,12 @@ from bitvmx_protocol_library.bitvmx_execution.services.execution_trace_generatio
 
 class ExecutionTraceCommitmentGenerationService:
 
-    def __init__(self, instruction_mapping_path: str):
+    def __init__(self, instruction_mapping_path: str, elf_file_name: str):
         self.instruction_mapping_path = instruction_mapping_path
+        self.elf_file_name = elf_file_name
 
     def __call__(self):
-        instruction_commitment_path = ExecutionTraceGenerationService.commitment_file()
+        instruction_commitment_path = ExecutionTraceGenerationService.commitment_file(self.elf_file_name)
         with open(self.instruction_mapping_path) as mapping_file:
             mapping_lines = mapping_file.readlines()
 

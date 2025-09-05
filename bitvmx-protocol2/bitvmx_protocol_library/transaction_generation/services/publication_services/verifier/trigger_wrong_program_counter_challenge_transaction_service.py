@@ -1,7 +1,6 @@
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
 from bitcoinutils.keys import PrivateKey
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_execution.entities.execution_trace_dto import ExecutionTraceDTO
 from bitvmx_protocol_library.bitvmx_execution.services.execution_trace_query_service import (
@@ -50,9 +49,8 @@ class TriggerWrongProgramCounterChallengeTransactionService:
             destroyed_public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
 
-        wrong_program_counter_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=trigger_challenge_taptree,
+        wrong_program_counter_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_scripts_list.get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_wrong_program_counter_challenge_index(
                 choice=bitvmx_protocol_verifier_dto.first_wrong_step
             ),
@@ -187,7 +185,7 @@ class TriggerWrongProgramCounterChallengeTransactionService:
                 + trigger_wrong_program_counter_challenge_signature
                 + [
                     current_script.to_hex(),
-                    wrong_program_counter_control_block.to_hex(),
+                    wrong_program_counter_control_block_hex,
                 ]
             )
         )

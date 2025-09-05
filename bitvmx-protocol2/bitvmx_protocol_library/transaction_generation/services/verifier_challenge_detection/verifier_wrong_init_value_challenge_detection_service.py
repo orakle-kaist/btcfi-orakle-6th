@@ -32,7 +32,9 @@ class VerifierWrongInitValueChallengeDetectionService:
     ):
         input_and_constant_addresses_generation_service = (
             InputAndConstantAddressesGenerationService(
-                instruction_commitment=ExecutionTraceGenerationService.commitment_file()
+                instruction_commitment=ExecutionTraceGenerationService.commitment_file(
+                    bitvmx_protocol_setup_properties_dto.elf_file_name
+                )
             )
         )
         input_and_constant_addresses = input_and_constant_addresses_generation_service(

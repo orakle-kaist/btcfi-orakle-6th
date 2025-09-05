@@ -1,95 +1,121 @@
-PC: 0xf0000000 Micro: 0 Opcode: 0xf0800117 Key: auipc
-PC: 0xf0000004 Micro: 0 Opcode: 0xfc010113 Key: addi
-PC: 0xf0000008 Micro: 0 Opcode: 0xbb001197 Key: auipc
-PC: 0xf000000c Micro: 0 Opcode: 0x80018193 Key: addi
-PC: 0xf0000010 Micro: 0 Opcode: 0x00000097 Key: auipc
-PC: 0xf0000014 Micro: 0 Opcode: 0x00c080e7 Key: jalr
-PC: 0xf0000018 Micro: 0 Opcode: 0x00100073 Key: nop
-PC: 0xf000001c Micro: 0 Opcode: 0xaa000737 Key: lui
-PC: 0xf0000020 Micro: 0 Opcode: 0x00070713 Key: addi
-PC: 0xf0000024 Micro: 0 Opcode: 0x00072603 Key: lhw_0
-PC: 0xf0000024 Micro: 1 Opcode: 0x00072603 Key: lhw_1
-PC: 0xf0000024 Micro: 2 Opcode: 0x00072603 Key: lhw_2
-PC: 0xf0000024 Micro: 3 Opcode: 0x00072603 Key: lhw_3
-PC: 0xf0000028 Micro: 0 Opcode: 0xab0007b7 Key: lui
-PC: 0xf000002c Micro: 0 Opcode: 0x00100693 Key: addi
-PC: 0xf0000030 Micro: 0 Opcode: 0x00078793 Key: addi
-PC: 0xf0000034 Micro: 0 Opcode: 0x00c6fa63 Key: bgeu
-PC: 0xf0000038 Micro: 0 Opcode: 0x0007a023 Key: sw_0
-PC: 0xf0000038 Micro: 1 Opcode: 0x0007a023 Key: sw_1
-PC: 0xf0000038 Micro: 2 Opcode: 0x0007a023 Key: sw_2
-PC: 0xf0000038 Micro: 3 Opcode: 0x0007a023 Key: sw_3
-PC: 0xf0000038 Micro: 4 Opcode: 0x0007a023 Key: sw_4
-PC: 0xf0000038 Micro: 5 Opcode: 0x0007a023 Key: sw_5
-PC: 0xf0000038 Micro: 6 Opcode: 0x0007a023 Key: sw_6
-PC: 0xf0000038 Micro: 7 Opcode: 0x0007a023 Key: sw_7
-PC: 0xf000003c Micro: 0 Opcode: 0x00d7a223 Key: sw_0
-PC: 0xf000003c Micro: 1 Opcode: 0x00d7a223 Key: sw_1
-PC: 0xf000003c Micro: 2 Opcode: 0x00d7a223 Key: sw_2
-PC: 0xf000003c Micro: 3 Opcode: 0x00d7a223 Key: sw_3
-PC: 0xf000003c Micro: 4 Opcode: 0x00d7a223 Key: sw_4
-PC: 0xf000003c Micro: 5 Opcode: 0x00d7a223 Key: sw_5
-PC: 0xf000003c Micro: 6 Opcode: 0x00d7a223 Key: sw_6
-PC: 0xf000003c Micro: 7 Opcode: 0x00d7a223 Key: sw_7
-PC: 0xf0000040 Micro: 0 Opcode: 0x00000513 Key: addi
-PC: 0xf0000044 Micro: 0 Opcode: 0x00008067 Key: jalr
-PC: 0xf0000048 Micro: 0 Opcode: 0x00472583 Key: lhw_0
-PC: 0xf0000048 Micro: 1 Opcode: 0x00472583 Key: lhw_1
-PC: 0xf0000048 Micro: 2 Opcode: 0x00472583 Key: lhw_2
-PC: 0xf0000048 Micro: 3 Opcode: 0x00472583 Key: lhw_3
-PC: 0xf000004c Micro: 0 Opcode: 0x3e700613 Key: addi
-PC: 0xf0000050 Micro: 0 Opcode: 0x00b67a63 Key: bgeu
-PC: 0xf0000054 Micro: 0 Opcode: 0x00472583 Key: lhw_0
-PC: 0xf0000054 Micro: 1 Opcode: 0x00472583 Key: lhw_1
-PC: 0xf0000054 Micro: 2 Opcode: 0x00472583 Key: lhw_2
-PC: 0xf0000054 Micro: 3 Opcode: 0x00472583 Key: lhw_3
-PC: 0xf0000058 Micro: 0 Opcode: 0x0007a637 Key: lui
-PC: 0xf000005c Micro: 0 Opcode: 0x12060613 Key: addi
-PC: 0xf0000060 Micro: 0 Opcode: 0x00b67a63 Key: bgeu
-PC: 0xf0000064 Micro: 0 Opcode: 0x0007a023 Key: sw_0
-PC: 0xf0000064 Micro: 1 Opcode: 0x0007a023 Key: sw_1
-PC: 0xf0000064 Micro: 2 Opcode: 0x0007a023 Key: sw_2
-PC: 0xf0000064 Micro: 3 Opcode: 0x0007a023 Key: sw_3
-PC: 0xf0000064 Micro: 4 Opcode: 0x0007a023 Key: sw_4
-PC: 0xf0000064 Micro: 5 Opcode: 0x0007a023 Key: sw_5
-PC: 0xf0000064 Micro: 6 Opcode: 0x0007a023 Key: sw_6
-PC: 0xf0000064 Micro: 7 Opcode: 0x0007a023 Key: sw_7
-PC: 0xf0000068 Micro: 0 Opcode: 0x00200713 Key: addi
-PC: 0xf000006c Micro: 0 Opcode: 0x00e7a223 Key: sw_0
-PC: 0xf000006c Micro: 1 Opcode: 0x00e7a223 Key: sw_1
-PC: 0xf000006c Micro: 2 Opcode: 0x00e7a223 Key: sw_2
-PC: 0xf000006c Micro: 3 Opcode: 0x00e7a223 Key: sw_3
-PC: 0xf000006c Micro: 4 Opcode: 0x00e7a223 Key: sw_4
-PC: 0xf000006c Micro: 5 Opcode: 0x00e7a223 Key: sw_5
-PC: 0xf000006c Micro: 6 Opcode: 0x00e7a223 Key: sw_6
-PC: 0xf000006c Micro: 7 Opcode: 0x00e7a223 Key: sw_7
-PC: 0xf0000070 Micro: 0 Opcode: 0xfd1ff06f Key: jal
-PC: 0xf0000074 Micro: 0 Opcode: 0x00d7a023 Key: sw_0
-PC: 0xf0000074 Micro: 1 Opcode: 0x00d7a023 Key: sw_1
-PC: 0xf0000074 Micro: 2 Opcode: 0x00d7a023 Key: sw_2
-PC: 0xf0000074 Micro: 3 Opcode: 0x00d7a023 Key: sw_3
-PC: 0xf0000074 Micro: 4 Opcode: 0x00d7a023 Key: sw_4
-PC: 0xf0000074 Micro: 5 Opcode: 0x00d7a023 Key: sw_5
-PC: 0xf0000074 Micro: 6 Opcode: 0x00d7a023 Key: sw_6
-PC: 0xf0000074 Micro: 7 Opcode: 0x00d7a023 Key: sw_7
-PC: 0xf0000078 Micro: 0 Opcode: 0x00872703 Key: lhw_0
-PC: 0xf0000078 Micro: 1 Opcode: 0x00872703 Key: lhw_1
-PC: 0xf0000078 Micro: 2 Opcode: 0x00872703 Key: lhw_2
-PC: 0xf0000078 Micro: 3 Opcode: 0x00872703 Key: lhw_3
-PC: 0xf000007c Micro: 0 Opcode: 0x00100513 Key: addi
-PC: 0xf0000080 Micro: 0 Opcode: 0x00e7a223 Key: sw_0
-PC: 0xf0000080 Micro: 1 Opcode: 0x00e7a223 Key: sw_1
-PC: 0xf0000080 Micro: 2 Opcode: 0x00e7a223 Key: sw_2
-PC: 0xf0000080 Micro: 3 Opcode: 0x00e7a223 Key: sw_3
-PC: 0xf0000080 Micro: 4 Opcode: 0x00e7a223 Key: sw_4
-PC: 0xf0000080 Micro: 5 Opcode: 0x00e7a223 Key: sw_5
-PC: 0xf0000080 Micro: 6 Opcode: 0x00e7a223 Key: sw_6
-PC: 0xf0000080 Micro: 7 Opcode: 0x00e7a223 Key: sw_7
-PC: 0xf0000084 Micro: 0 Opcode: 0x00008067 Key: jalr
+    Finished `release` profile [optimized] target(s) in 0.28s
+     Running `target/release/emulator generate-rom-commitment --elf ../execution_files/option_registration_final.elf`
+PC: 0x00000000 Micro: 0 Opcode: 0xe0001137 Key: lui
+PC: 0x00000004 Micro: 0 Opcode: 0x00000097 Key: auipc
+PC: 0x00000008 Micro: 0 Opcode: 0x014080e7 Key: jalr
+PC: 0x0000000c Micro: 0 Opcode: 0x00000513 Key: addi
+PC: 0x00000010 Micro: 0 Opcode: 0x05d00893 Key: addi
+PC: 0x00000014 Micro: 0 Opcode: 0x00000073 Key: ecall
+PC: 0x00000018 Micro: 0 Opcode: 0xaa0007b7 Key: lui
+PC: 0x0000001c Micro: 0 Opcode: 0x00078793 Key: addi
+PC: 0x00000020 Micro: 0 Opcode: 0x0007a583 Key: lhw_0
+PC: 0x00000020 Micro: 1 Opcode: 0x0007a583 Key: lhw_1
+PC: 0x00000020 Micro: 2 Opcode: 0x0007a583 Key: lhw_2
+PC: 0x00000020 Micro: 3 Opcode: 0x0007a583 Key: lhw_3
+PC: 0x00000024 Micro: 0 Opcode: 0x0047a703 Key: lhw_0
+PC: 0x00000024 Micro: 1 Opcode: 0x0047a703 Key: lhw_1
+PC: 0x00000024 Micro: 2 Opcode: 0x0047a703 Key: lhw_2
+PC: 0x00000024 Micro: 3 Opcode: 0x0047a703 Key: lhw_3
+PC: 0x00000028 Micro: 0 Opcode: 0x0087a683 Key: lhw_0
+PC: 0x00000028 Micro: 1 Opcode: 0x0087a683 Key: lhw_1
+PC: 0x00000028 Micro: 2 Opcode: 0x0087a683 Key: lhw_2
+PC: 0x00000028 Micro: 3 Opcode: 0x0087a683 Key: lhw_3
+PC: 0x0000002c Micro: 0 Opcode: 0x00c7a603 Key: lhw_0
+PC: 0x0000002c Micro: 1 Opcode: 0x00c7a603 Key: lhw_1
+PC: 0x0000002c Micro: 2 Opcode: 0x00c7a603 Key: lhw_2
+PC: 0x0000002c Micro: 3 Opcode: 0x00c7a603 Key: lhw_3
+PC: 0x00000030 Micro: 0 Opcode: 0xf00007b7 Key: lui
+PC: 0x00000034 Micro: 0 Opcode: 0x00078793 Key: addi
+PC: 0x00000038 Micro: 0 Opcode: 0x00100513 Key: addi
+PC: 0x0000003c Micro: 0 Opcode: 0x00a7a023 Key: sw_0
+PC: 0x0000003c Micro: 1 Opcode: 0x00a7a023 Key: sw_1
+PC: 0x0000003c Micro: 2 Opcode: 0x00a7a023 Key: sw_2
+PC: 0x0000003c Micro: 3 Opcode: 0x00a7a023 Key: sw_3
+PC: 0x0000003c Micro: 4 Opcode: 0x00a7a023 Key: sw_4
+PC: 0x0000003c Micro: 5 Opcode: 0x00a7a023 Key: sw_5
+PC: 0x0000003c Micro: 6 Opcode: 0x00a7a023 Key: sw_6
+PC: 0x0000003c Micro: 7 Opcode: 0x00a7a023 Key: sw_7
+PC: 0x00000040 Micro: 0 Opcode: 0x06400513 Key: addi
+PC: 0x00000044 Micro: 0 Opcode: 0x00a7a223 Key: sw_0
+PC: 0x00000044 Micro: 1 Opcode: 0x00a7a223 Key: sw_1
+PC: 0x00000044 Micro: 2 Opcode: 0x00a7a223 Key: sw_2
+PC: 0x00000044 Micro: 3 Opcode: 0x00a7a223 Key: sw_3
+PC: 0x00000044 Micro: 4 Opcode: 0x00a7a223 Key: sw_4
+PC: 0x00000044 Micro: 5 Opcode: 0x00a7a223 Key: sw_5
+PC: 0x00000044 Micro: 6 Opcode: 0x00a7a223 Key: sw_6
+PC: 0x00000044 Micro: 7 Opcode: 0x00a7a223 Key: sw_7
+PC: 0x00000048 Micro: 0 Opcode: 0x00b7a423 Key: sw_0
+PC: 0x00000048 Micro: 1 Opcode: 0x00b7a423 Key: sw_1
+PC: 0x00000048 Micro: 2 Opcode: 0x00b7a423 Key: sw_2
+PC: 0x00000048 Micro: 3 Opcode: 0x00b7a423 Key: sw_3
+PC: 0x00000048 Micro: 4 Opcode: 0x00b7a423 Key: sw_4
+PC: 0x00000048 Micro: 5 Opcode: 0x00b7a423 Key: sw_5
+PC: 0x00000048 Micro: 6 Opcode: 0x00b7a423 Key: sw_6
+PC: 0x00000048 Micro: 7 Opcode: 0x00b7a423 Key: sw_7
+PC: 0x0000004c Micro: 0 Opcode: 0x00e7a623 Key: sw_0
+PC: 0x0000004c Micro: 1 Opcode: 0x00e7a623 Key: sw_1
+PC: 0x0000004c Micro: 2 Opcode: 0x00e7a623 Key: sw_2
+PC: 0x0000004c Micro: 3 Opcode: 0x00e7a623 Key: sw_3
+PC: 0x0000004c Micro: 4 Opcode: 0x00e7a623 Key: sw_4
+PC: 0x0000004c Micro: 5 Opcode: 0x00e7a623 Key: sw_5
+PC: 0x0000004c Micro: 6 Opcode: 0x00e7a623 Key: sw_6
+PC: 0x0000004c Micro: 7 Opcode: 0x00e7a623 Key: sw_7
+PC: 0x00000050 Micro: 0 Opcode: 0x00d7a823 Key: sw_0
+PC: 0x00000050 Micro: 1 Opcode: 0x00d7a823 Key: sw_1
+PC: 0x00000050 Micro: 2 Opcode: 0x00d7a823 Key: sw_2
+PC: 0x00000050 Micro: 3 Opcode: 0x00d7a823 Key: sw_3
+PC: 0x00000050 Micro: 4 Opcode: 0x00d7a823 Key: sw_4
+PC: 0x00000050 Micro: 5 Opcode: 0x00d7a823 Key: sw_5
+PC: 0x00000050 Micro: 6 Opcode: 0x00d7a823 Key: sw_6
+PC: 0x00000050 Micro: 7 Opcode: 0x00d7a823 Key: sw_7
+PC: 0x00000054 Micro: 0 Opcode: 0x00c7aa23 Key: sw_0
+PC: 0x00000054 Micro: 1 Opcode: 0x00c7aa23 Key: sw_1
+PC: 0x00000054 Micro: 2 Opcode: 0x00c7aa23 Key: sw_2
+PC: 0x00000054 Micro: 3 Opcode: 0x00c7aa23 Key: sw_3
+PC: 0x00000054 Micro: 4 Opcode: 0x00c7aa23 Key: sw_4
+PC: 0x00000054 Micro: 5 Opcode: 0x00c7aa23 Key: sw_5
+PC: 0x00000054 Micro: 6 Opcode: 0x00c7aa23 Key: sw_6
+PC: 0x00000054 Micro: 7 Opcode: 0x00c7aa23 Key: sw_7
+PC: 0x00000058 Micro: 0 Opcode: 0x00d70733 Key: add
+PC: 0x0000005c Micro: 0 Opcode: 0x00e7ac23 Key: sw_0
+PC: 0x0000005c Micro: 1 Opcode: 0x00e7ac23 Key: sw_1
+PC: 0x0000005c Micro: 2 Opcode: 0x00e7ac23 Key: sw_2
+PC: 0x0000005c Micro: 3 Opcode: 0x00e7ac23 Key: sw_3
+PC: 0x0000005c Micro: 4 Opcode: 0x00e7ac23 Key: sw_4
+PC: 0x0000005c Micro: 5 Opcode: 0x00e7ac23 Key: sw_5
+PC: 0x0000005c Micro: 6 Opcode: 0x00e7ac23 Key: sw_6
+PC: 0x0000005c Micro: 7 Opcode: 0x00e7ac23 Key: sw_7
+PC: 0x00000060 Micro: 0 Opcode: 0x00005737 Key: lui
+PC: 0x00000064 Micro: 0 Opcode: 0x67870713 Key: addi
+PC: 0x00000068 Micro: 0 Opcode: 0x00e7ae23 Key: sw_0
+PC: 0x00000068 Micro: 1 Opcode: 0x00e7ae23 Key: sw_1
+PC: 0x00000068 Micro: 2 Opcode: 0x00e7ae23 Key: sw_2
+PC: 0x00000068 Micro: 3 Opcode: 0x00e7ae23 Key: sw_3
+PC: 0x00000068 Micro: 4 Opcode: 0x00e7ae23 Key: sw_4
+PC: 0x00000068 Micro: 5 Opcode: 0x00e7ae23 Key: sw_5
+PC: 0x00000068 Micro: 6 Opcode: 0x00e7ae23 Key: sw_6
+PC: 0x00000068 Micro: 7 Opcode: 0x00e7ae23 Key: sw_7
+PC: 0x0000006c Micro: 0 Opcode: 0x00000513 Key: addi
+PC: 0x00000070 Micro: 0 Opcode: 0x00008067 Key: jalr
 Address: 0xaa000000 value: 0x00000000
 Address: 0xaa000004 value: 0x00000000
 Address: 0xaa000008 value: 0x00000000
 Address: 0xaa00000c value: 0x00000000
-Address: 0xab000000 value: 0x00000000
-Address: 0xab000004 value: 0x00000000
-Entrypoint: 0xf0000000
+Address: 0xf0000000 value: 0x00000000
+Address: 0xf0000004 value: 0x00000000
+Address: 0xf0000008 value: 0x00000000
+Address: 0xf000000c value: 0x00000000
+Address: 0xf0000010 value: 0x00000000
+Address: 0xf0000014 value: 0x00000000
+Address: 0xf0000018 value: 0x00000000
+Address: 0xf000001c value: 0x00000000
+Address: 0xf0000020 value: 0x00000000
+Address: 0xf0000024 value: 0x00000000
+Address: 0xf0000028 value: 0x00000000
+Address: 0xf000002c value: 0x00000000
+Address: 0xf0000030 value: 0x00000000
+Address: 0xf0000034 value: 0x00000000
+Address: 0xf0000038 value: 0x00000000
+Address: 0xf000003c value: 0x00000000
+Zero initialized range: start: 0xe0000000 size: 0x00001000
+Entrypoint: 0x00000000

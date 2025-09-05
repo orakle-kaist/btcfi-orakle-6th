@@ -83,7 +83,7 @@ class BitVMXWrapper:
             * self.execution_checkpoint_interval
         )
         print(
-            "Executing command for list "
+            "[DEBUG] Executing command for list "
             + str(index)
             + " with step "
             + str(base_point)
@@ -92,6 +92,8 @@ class BitVMXWrapper:
             + " with base 0 index "
             + str(index - 1)
         )
+        print(f"[DEBUG] Using base_path: {self.base_path}")
+        print(f"[DEBUG] Using setup_uuid: {setup_uuid}")
         command = [
             "cargo",
             "run",
@@ -147,12 +149,15 @@ class BitVMXWrapper:
 
         execution_directory = self.base_path + setup_uuid
 
+        print(f"[DEBUG] Running trace command: {' '.join(command[:10])}...")  # First 10 args
+        print(f"[DEBUG] Working directory: {execution_directory}")
+        
         try:
             # Run the command in the specified directory
             result = subprocess.run(
                 command, capture_output=True, text=True, check=True, cwd=execution_directory
             )
-            print("Done executing command")
+            print(f"[DEBUG] Done executing command, output length: {len(result.stdout)}")
             execution_trace = result.stdout
             # TODO: remove when bugs are fixed
             try:
@@ -173,10 +178,24 @@ class BitVMXWrapper:
 
         except subprocess.CalledProcessError as e:
             # Handle errors in execution
-            print("An error occurred while running the command.")
-            print("Return code:", e.returncode)
-            print("Output:\n", e.stdout)
-            print("Errors:\n", e.stderr)
+            print("[ERROR] An error occurred while running the trace command.")
+            print(f"[ERROR] Return code: {e.returncode}")
+            print(f"[ERROR] Working directory: {execution_directory}")
+            print(f"[ERROR] Command: {' '.join(command)}")
+            print(f"[ERROR] Output:\n{e.stdout}")
+            print(f"[ERROR] Errors:\n{e.stderr}")
+            
+            # Check if checkpoints exist
+            import glob as glob_module
+            checkpoint_files = glob_module.glob(os.path.join(execution_directory, "checkpoint.*.json"))
+            print(f"[ERROR] Found {len(checkpoint_files)} checkpoint files in {execution_directory}")
+            if checkpoint_files:
+                print(f"[ERROR] Sample checkpoints:")
+                for cp_file in checkpoint_files[:3]:
+                    print(f"[ERROR]   - {os.path.basename(cp_file)}")
+            else:
+                print(f"[ERROR] No checkpoint files found! Need to generate checkpoints first.")
+            
             raise Exception("Some problem with the computation")
 
     def generate_execution_checkpoints(
@@ -189,6 +208,8 @@ class BitVMXWrapper:
         print(f"[DEBUG] Directory: {directory}")
         print(f"[DEBUG] ELF file: {elf_file}")
         print(f"[DEBUG] Input hex: {input_hex}")
+        print(f"[DEBUG] Base path: {self.base_path}")
+        print(f"[DEBUG] Setup UUID: {setup_uuid}")
 
         # List all files in the specified directory
         try:
@@ -213,7 +234,7 @@ class BitVMXWrapper:
                 "--",
                 "execute",
                 "--elf",
-                "../../BitVMX-CPU/docker-riscv32/riscv32/build/" + elf_file,
+                "/bitvmx-backend/execution_files/" + elf_file,
                 "--debug",
                 "--checkpoints",
             ]
@@ -264,9 +285,19 @@ class BitVMXWrapper:
 
             try:
                 # Run the command in the specified directory
-                subprocess.run(
+                print(f"[DEBUG] Running command with cwd: {execution_directory}")
+                result = subprocess.run(
                     command, capture_output=True, text=True, check=True, cwd=execution_directory
                 )
+                print(f"[DEBUG] Command output: {result.stdout[:500]}...")  # First 500 chars
+                print(f"[DEBUG] Checkpoints generated successfully")
+                
+                # Verify checkpoints were created
+                import glob as glob_module
+                checkpoint_files = glob_module.glob(os.path.join(execution_directory, "checkpoint.*.json"))
+                print(f"[DEBUG] Found {len(checkpoint_files)} checkpoint files after generation")
+                for cp_file in checkpoint_files[:5]:  # Show first 5
+                    print(f"[DEBUG]   - {os.path.basename(cp_file)}")
 
             except subprocess.CalledProcessError as e:
                 # Handle errors in execution
@@ -276,4 +307,36 @@ class BitVMXWrapper:
                 print(f"[ERROR] Command: {' '.join(command)}")
                 print(f"[ERROR] Output:\n{e.stdout}")
                 print(f"[ERROR] Errors:\n{e.stderr}")
+                
+                # Check if ELF file exists
+                elf_path = "./execution_files/" + elf_file
+                if os.path.exists(elf_path):
+                    print(f"[ERROR] ELF file exists at: {elf_path}")
+                    print(f"[ERROR] ELF file size: {os.path.getsize(elf_path)} bytes")
+                else:
+                    print(f"[ERROR] ELF file NOT found at: {elf_path}")
+                    # List available ELF files
+                    import glob as glob_module
+                    elf_files = glob_module.glob("./execution_files/*.elf")
+                    print(f"[ERROR] Available ELF files in execution_files:")
+                    for ef in elf_files:
+                        print(f"[ERROR]   - {os.path.basename(ef)}")
+                
+                # Check BitVMX-CPU location
+                bitvmx_path = "../../BitVMX-CPU/Cargo.toml"
+                if os.path.exists(bitvmx_path):
+                    print(f"[ERROR] BitVMX-CPU found at: {bitvmx_path}")
+                else:
+                    print(f"[ERROR] BitVMX-CPU NOT found at: {bitvmx_path}")
+                    # Try alternative paths
+                    alt_paths = [
+                        "../BitVMX-CPU/Cargo.toml",
+                        "./BitVMX-CPU/Cargo.toml",
+                        "/bitvmx-backend/BitVMX-CPU/Cargo.toml"
+                    ]
+                    for alt in alt_paths:
+                        if os.path.exists(alt):
+                            print(f"[ERROR] Found BitVMX-CPU at alternative path: {alt}")
+                            break
+                
                 raise Exception("Some problem with the computation")

@@ -1,5 +1,4 @@
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_setup_properties_dto import (
     BitVMXProtocolSetupPropertiesDTO,
@@ -99,16 +98,11 @@ class TriggerExecutionChallengeTransactionService:
         )
 
         # TODO: we should load this address from protocol dict as we add more challenges
-        trigger_challenge_taptree = bitvmx_bitcoin_scripts_dto.trigger_challenge_taptree()
-        trigger_challenge_scripts_address = (
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key.get_taproot_address(
-                trigger_challenge_taptree
-            )
+        trigger_challenge_scripts_address = bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_scripts_list.get_taproot_address(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
-
-        challenge_scripts_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=trigger_challenge_taptree,
+        challenge_scripts_control_block_hex = bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_scripts_list.get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=bitvmx_bitcoin_scripts_dto.trigger_challenge_index(0),
             is_odd=trigger_challenge_scripts_address.is_odd(),
         )
@@ -150,7 +144,7 @@ class TriggerExecutionChallengeTransactionService:
                 + trigger_challenge_witness
                 + [
                     bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_scripts_list[0].to_hex(),
-                    challenge_scripts_control_block.to_hex(),
+                    challenge_scripts_control_block_hex,
                 ]
             )
         )

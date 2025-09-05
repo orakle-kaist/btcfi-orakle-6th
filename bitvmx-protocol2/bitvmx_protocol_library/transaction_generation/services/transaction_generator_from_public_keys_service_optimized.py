@@ -93,6 +93,19 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
     ) -> BitVMXTransactionsDTO:
         start_time = time.time()
         
+        # CRITICAL: Check if scripts DTO already exists and reuse it
+        if not hasattr(bitvmx_protocol_setup_properties_dto, 'bitvmx_bitcoin_scripts_dto') or \
+           bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto is None:
+            # This should not happen - scripts should be generated in setup controller
+            print("[CRITICAL ERROR] No scripts DTO found in setup properties!")
+            raise ValueError("Scripts DTO must be generated before transaction generation")
+        
+        # Log fingerprint for tracking
+        if hasattr(bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto, 'tree_fingerprint'):
+            print(f"[SCRIPT FINGERPRINT] Using scripts with fingerprint: {bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.tree_fingerprint}")
+        else:
+            print("[WARNING] Scripts DTO has no fingerprint - script consistency cannot be verified")
+        
         # Helper function for consistent iteration handling
         def _iter_range(iterations: int):
             """Returns iteration range for 0-based indexing"""
@@ -101,7 +114,12 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
                 return [0]  # Single iteration with index 0
             return range(it)  # 0..(iterations-1)
         
-        destroyed_public_key = bitvmx_protocol_setup_properties_dto.unspendable_public_key
+        # Try both field names for compatibility
+        destroyed_public_key = getattr(bitvmx_protocol_setup_properties_dto, 'unspendable_public_key', None)
+        if not destroyed_public_key:
+            destroyed_public_key = getattr(bitvmx_protocol_setup_properties_dto, 'seed_unspendable_public_key', None)
+        if not destroyed_public_key:
+            raise ValueError("No unspendable_public_key found in DTO")
         
         # Immutable value extraction with protection
         fa = int(bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis)
@@ -138,14 +156,40 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
             script_sig=Script([])  # Initialize with empty script for segwit
         )
         
-        hash_result_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_result_script.get_taproot_address(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key
+        # Use the SAME Taproot tree as used by signing (hash_result + prover_timeout)
+        from bitvmx_protocol_library.script_generation.entities.business_objects.bitcoin_script_list import BitcoinScriptList
+        golden_hash_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_result_script
+        prover_timeout_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.prover_timeout_script
+        # CRITICAL: Set fixed tree_key for consistent address generation
+        funding_script_tree = BitcoinScriptList([golden_hash_script, prover_timeout_script])
+        # Force consistent tree_key to avoid randomization
+        if not hasattr(funding_script_tree, '_tree_key_set'):
+            import hashlib
+            # Generate deterministic tree_key from scripts
+            combined = golden_hash_script.to_hex() + prover_timeout_script.to_hex()
+            tree_key = hashlib.sha256(combined.encode()).hexdigest()[:16]
+            funding_script_tree._tree_key = tree_key
+            funding_script_tree._tree_key_set = True
+            print(f"[FUNDING_TX] Set deterministic tree_key: {tree_key}")
+        # Use the same destroyed_public_key for consistency
+        unspendable_key = getattr(bitvmx_protocol_setup_properties_dto, 'unspendable_public_key', None)
+        if not unspendable_key:
+            unspendable_key = getattr(bitvmx_protocol_setup_properties_dto, 'seed_unspendable_public_key', None)
+        funding_taproot_address = funding_script_tree.get_taproot_address(
+            unspendable_key
         )
+        print(f"[FUNDING_TX] Generated taproot address: {funding_taproot_address.to_string()}")
+        print(f"[FUNDING_TX] Witness program: {funding_taproot_address.to_script_pub_key().to_hex()[4:]}")
+
+        # Build funding output to the Taproot tree address
+        # Keep full amount here for consistency with verifier
+        funding_output_amount = funding_amount
         
         funding_txout = TxOutput(
-            funding_amount,
-            hash_result_script_address.to_script_pub_key(),
+            funding_output_amount,
+            funding_taproot_address.to_script_pub_key(),
         )
+        print(f"[FUNDING_TX] Output scriptPubKey: {funding_taproot_address.to_script_pub_key().to_hex()}")
         
         funding_tx = Transaction([funding_txin], [funding_txout], has_segwit=True)
         
@@ -194,10 +238,21 @@ class TransactionGeneratorFromPublicKeysServiceOptimized:
         actual_funding_txid = bitvmx_protocol_setup_properties_dto.funding_tx_id
         actual_funding_index = bitvmx_protocol_setup_properties_dto.funding_index
         hash_result_txin = TxInput(actual_funding_txid, actual_funding_index, script_sig=Script([]))
-        hash_result_output_amount = funding_amount - step_fees
         
-        # Fee verification logging
+        # Use dedicated hash fee for the heavy hash_result transaction
+        from bitvmx_protocol_library.config import common_protocol_properties
+        try:
+            hash_fee = int(common_protocol_properties.hash_fees_satoshis)
+            print(f"[FEES] Using HASH_FEES_SATOSHIS={hash_fee} for hash_result_tx")
+        except Exception:
+            hash_fee = step_fees  # fallback to step fee if config not available
+            print(f"[WARNING] Using fallback step_fees={step_fees} for hash_result_tx")
         
+        # Compute hash_result_output_amount using hash_fee and wrapper-adjusted amount
+        # CRITICAL: Account for wrapper fee (5000 sats) that will be deducted in signing phase
+        wrapper_fee = 5000
+        adjusted_funding_amount = funding_amount - wrapper_fee
+        hash_result_output_amount = max(0, adjusted_funding_amount - hash_fee)
         hash_result_txOut = TxOutput(
             hash_result_output_amount, trigger_protocol_script_address.to_script_pub_key()
         )

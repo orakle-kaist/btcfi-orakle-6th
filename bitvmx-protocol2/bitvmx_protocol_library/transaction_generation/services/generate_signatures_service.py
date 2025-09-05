@@ -1,4 +1,5 @@
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
+import hashlib
 from bitcoinutils.transactions import TxWitnessInput
 import hashlib
 
@@ -90,24 +91,93 @@ class GenerateSignaturesService:
             print(f"[SIGN] Failed to get chain prevout, falling back to DTO: {e}")
             # Fallback to DTO values if chain query fails
             funding_prevout_amount = bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis
-            hash_result_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_result_script.get_taproot_address(
-                self.destroyed_public_key
+            # CRITICAL: We should NEVER use hash_result_script_address as prevout!
+            # The wrapping tx output is NOT the same as hash_result_script_address
+            # We need to get the actual script from somewhere else
+            print(f"[SIGN ERROR] Cannot fallback - need actual wrapping tx output script!")
+            raise Exception("Cannot sign without actual wrapping tx output script")
+        
+        # Log critical signing information for debugging
+        print(f"[SIGN DEBUG] ===== hash_result_tx signing details =====")
+        print(f"[SIGN DEBUG] Input txid: {bitvmx_protocol_setup_properties_dto.funding_tx_id}")
+        print(f"[SIGN DEBUG] Input index: {bitvmx_protocol_setup_properties_dto.funding_index}")
+        print(f"[SIGN DEBUG] Prevout script (from chain): {funding_prevout_script.to_hex()}")
+        print(f"[SIGN DEBUG] Prevout amount (from chain): {funding_prevout_amount}")
+        
+        # [GEMINI FINAL FIX] Load script AND control block from cache to ensure consistency
+        import json
+        import os
+        from bitvmx_protocol_library.script_generation.entities.business_objects.bitcoin_script import BitcoinScript
+        from bitvmx_protocol_library.script_generation.entities.business_objects.bitcoin_script_list import BitcoinScriptList
+
+        hash_result_script = None
+        control_block_bytes = None
+        setup_uuid = bitvmx_protocol_setup_properties_dto.setup_uuid
+        signing_cache_file = f"prover_files/{setup_uuid}/signing_cache.json"
+
+        try:
+            if os.path.exists(signing_cache_file):
+                print(f"[GEMINI_CACHE] Loading golden script and control block from {signing_cache_file}")
+                with open(signing_cache_file, 'r') as f:
+                    cache_data = json.load(f)
+                golden_hex = cache_data.get("hash_result_script_hex")
+                control_block_hex = cache_data.get("control_block_hex")
+
+                if golden_hex and control_block_hex:
+                    hash_result_script = BitcoinScript.from_raw(golden_hex)
+                    control_block_bytes = bytes.fromhex(control_block_hex)
+                    print("[GEMINI_CACHE] Successfully loaded golden script and control block.")
+                else:
+                    print("[GEMINI_CACHE] WARNING: Cache file is missing required data.")
+            else:
+                print(f"[GEMINI_CACHE] WARNING: signing_cache.json not found at {signing_cache_file}.")
+
+        except Exception as e:
+            print(f"[GEMINI_CACHE] CRITICAL WARNING: Failed to load signing cache, will fallback to DTO. Error: {e}")
+
+        if hash_result_script is None or control_block_bytes is None:
+            print("[GEMINI_CACHE] FALLBACK: Using data from DTO. This may cause signature errors.")
+            hash_result_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_result_script
+            # Fallback control block generation (the original, likely buggy path)
+            prover_timeout_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.prover_timeout_script
+            tree_key = hashlib.sha256(hash_result_script.to_hex().encode() + prover_timeout_script.to_hex().encode()).digest()[:8].hex(); temp_tree = BitcoinScriptList([hash_result_script, prover_timeout_script], tree_key=tree_key)
+            temp_addr = temp_tree.get_taproot_address(self.destroyed_public_key)
+            control_block_bytes = bytes.fromhex(temp_tree.get_control_block_hex(self.destroyed_public_key, 0, temp_addr.is_odd()))
+        print(f"[SIGN DEBUG] Tapleaf script size: {len(hash_result_script.to_bytes())} bytes")
+        print(f"[SIGN DEBUG] Tapleaf script first 100 bytes: {hash_result_script.to_hex()[:100]}...")
+        
+        # Get the address for comparison using the SAME Taproot tree as funding output
+        from bitvmx_protocol_library.script_generation.entities.business_objects.bitcoin_script_list import BitcoinScriptList
+        prover_timeout_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.prover_timeout_script
+        tree_key = hashlib.sha256(hash_result_script.to_hex().encode() + prover_timeout_script.to_hex().encode()).digest()[:8].hex(); funding_tree = BitcoinScriptList([hash_result_script, prover_timeout_script], tree_key=tree_key)
+        funding_tree_address = funding_tree.get_taproot_address(self.destroyed_public_key)
+        expected_spk_hex = funding_tree_address.to_script_pub_key().to_hex().lower()
+        chain_spk_hex = funding_prevout_script.to_hex().lower()
+        print(f"[SIGN DEBUG] Expected spending address: {funding_tree_address.to_string()}")
+        print(f"[SIGN DEBUG] Expected scriptPubKey: {expected_spk_hex}")
+        print(f"[SIGN DEBUG] Chain prevout scriptPubKey: {chain_spk_hex}")
+        
+        # Preflight: Ensure the external funding UTXO pays to the expected Taproot script
+        if expected_spk_hex != chain_spk_hex:
+            print("[SIGN ERROR] Funding UTXO scriptPubKey does not match expected Taproot address for hash_result spend.")
+            print(f"[SIGN ERROR] Expected: {expected_spk_hex}")
+            print(f"[SIGN ERROR] Found:    {chain_spk_hex}")
+            raise Exception(
+                "Funding UTXO does not pay to the required Taproot script. "
+                "Fund the printed hash_result address, then regenerate signatures."
             )
-            funding_prevout_script = hash_result_script_address.to_script_pub_key()
-            print(f"[SIGN] Fallback prevout script: {funding_prevout_script.to_hex()}")
-            print(f"[SIGN] Fallback prevout amount: {funding_prevout_amount} sats")
+        print(f"[SIGN DEBUG] ==========================================")
         
-        hash_result_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_result_script.get_taproot_address(
-            self.destroyed_public_key
-        )
-        
+        # [GEMINI FINAL FIX] Use the cached control block for signing
+        print(f"[GEMINI_DEBUG] Signing hash_result_tx with cached script and control block.")
+
         hash_result_signature = self.private_key.sign_taproot_input(
             bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.hash_result_tx,
             0,
             [funding_prevout_script],  # Use actual chain prevout script
             [funding_prevout_amount],  # Use actual chain amount
             script_path=True,
-            tapleaf_script=bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_result_script,
+            tapleaf_script=hash_result_script,
             sighash=TAPROOT_SIGHASH_ALL,
             tweak=False,
         )
@@ -170,6 +240,9 @@ class GenerateSignaturesService:
             len(search_choice_list)
         )
         
+        # Track previous transaction for chaining
+        prev_tx = bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.trigger_protocol_tx
+        
         for i in range(num_iterations):
             current_search_hash_tx = search_hash_list[i]
             
@@ -182,14 +255,21 @@ class GenerateSignaturesService:
                 current_hash_search_scripts_list, self.destroyed_public_key, current_hash_search_index
             )
             current_search_hash_script = current_hash_search_scripts_list[current_hash_search_index]
+            
+            # Get actual prevout amount from parent transaction output
+            if prev_tx and hasattr(prev_tx, 'outputs') and len(prev_tx.outputs) > 0:
+                search_hash_input_amount = prev_tx.outputs[0].amount
+                print(f"[SIGN] search_hash_tx[{i}] using actual parent output: {search_hash_input_amount} sats")
+            else:
+                # Fallback to calculation
+                search_hash_input_amount = funding_prevout_amount - (2 * i + 2) * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
+                print(f"[SIGN] search_hash_tx[{i}] using calculated amount: {search_hash_input_amount} sats")
+            
             current_search_hash_signature = self.private_key.sign_taproot_input(
                 current_search_hash_tx,
                 0,
                 [current_search_hash_script_address.to_script_pub_key()],
-                [
-                    funding_prevout_amount
-                    - (2 * i + 2) * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
-                ],
+                [search_hash_input_amount],
                 script_path=True,
                 tapleaf_script=current_search_hash_script,
                 sighash=TAPROOT_SIGHASH_ALL,
@@ -208,20 +288,30 @@ class GenerateSignaturesService:
                 current_choice_search_scripts_list, self.destroyed_public_key, current_choice_search_index
             )
             current_search_choice_script = current_choice_search_scripts_list[current_choice_search_index]
+            
+            # Get actual prevout amount from search_hash_tx output
+            if current_search_hash_tx and hasattr(current_search_hash_tx, 'outputs') and len(current_search_hash_tx.outputs) > 0:
+                search_choice_input_amount = current_search_hash_tx.outputs[0].amount
+                print(f"[SIGN] search_choice_tx[{i}] using actual parent output: {search_choice_input_amount} sats")
+            else:
+                # Fallback to calculation
+                search_choice_input_amount = funding_prevout_amount - (2 * i + 3) * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
+                print(f"[SIGN] search_choice_tx[{i}] using calculated amount: {search_choice_input_amount} sats")
+            
             current_search_choice_signature = self.private_key.sign_taproot_input(
                 current_search_choice_tx,
                 0,
                 [current_search_choice_script_address.to_script_pub_key()],
-                [
-                    funding_prevout_amount
-                    - (2 * i + 3) * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
-                ],
+                [search_choice_input_amount],
                 script_path=True,
                 tapleaf_script=current_search_choice_script,
                 sighash=TAPROOT_SIGHASH_ALL,
                 tweak=False,
             )
             search_choice_signatures.append(current_search_choice_signature)
+            
+            # Update prev_tx for next iteration
+            prev_tx = current_search_choice_tx
 
         # Use cached paths for trace_tx
         trace_script_list = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trace_script_list
@@ -232,6 +322,19 @@ class GenerateSignaturesService:
             trace_script_list, self.destroyed_public_key, trace_index
         )
         trace_script = trace_script_list[trace_index]
+        
+        # Get actual prevout amount from last search_choice_tx
+        if prev_tx and hasattr(prev_tx, 'outputs') and len(prev_tx.outputs) > 0:
+            trace_input_amount = prev_tx.outputs[0].amount
+            print(f"[SIGN] trace_tx using actual parent output: {trace_input_amount} sats")
+        else:
+            # Fallback to calculation
+            trace_input_amount = funding_prevout_amount - (
+                2 * len(bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.search_hash_tx_list) + 2
+            ) * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
+            print(f"[SIGN] trace_tx using calculated amount: {trace_input_amount} sats")
+        
+        # Use the actual or calculated amount for trace_tx signature
         trace_signature = self._sign_with_cached_control_block(
             bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.trace_tx,
             0,
@@ -239,17 +342,7 @@ class GenerateSignaturesService:
             trace_index,
             self.destroyed_public_key,
             [trace_script_address.to_script_pub_key()],
-            [
-                funding_prevout_amount
-                - (
-                    2
-                    * len(
-                        bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.search_hash_tx_list
-                    )
-                    + 2
-                )
-                * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
-            ]
+            [trace_input_amount]  # Use the actual amount from parent
         )
 
         # FALLBACK CONSISTENCY: Use lightweight P2WPKH instead of heavy BitVMX tree address
@@ -265,18 +358,22 @@ class GenerateSignaturesService:
             * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
         )
         
-        # Use P2WPKH fallback address (no BitVMX tree computation)
-        from bitcoinutils.keys import P2wpkhAddress
-        fallback_address = P2wpkhAddress.from_address(self.destroyed_public_key.get_address().to_string())
-        trigger_execution_prevout_script = fallback_address.to_script_pub_key()
-        print(f"[FALLBACK] Using P2WPKH fallback address: {trigger_execution_prevout_amount} sats")
+        # Use Taproot address with BitVMX tree (정석 방법)
+        trigger_execution_prevout_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(self.destroyed_public_key).to_script_pub_key()
+        print(f"[TAPROOT] Using proper Taproot address: {trigger_execution_prevout_amount} sats")
         
-        # Sign with P2WPKH (no BitVMX tree recalculation)
-        trigger_execution_challenge_signature = self.private_key.sign_input(
+        # Sign with Taproot script path (BitVMX 표준)
+        # Get tapleaf script for Taproot script path signing
+        # Use index 0 as default since choice_read_search_index may not exist
+        tapleaf_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_challenge_scripts[0]
+        
+        trigger_execution_challenge_signature = self.private_key.sign_taproot_input(
             bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.trigger_execution_challenge_tx,
             0,
-            trigger_execution_prevout_script,
-            trigger_execution_prevout_amount
+            [trigger_execution_prevout_script],  # scripts must be a list when script_path=True
+            [trigger_execution_prevout_amount],  # amounts must be a list for Taproot
+            script_path=True,
+            tapleaf_script=tapleaf_script
         )
 
         read_search_hash_signatures = []
@@ -303,12 +400,12 @@ class GenerateSignaturesService:
             trace_tx = bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.trace_tx
             if hasattr(trace_tx, 'outputs') and len(trace_tx.outputs) > 0:
                 # Use actual prevout from trace_tx output
-                trigger_challenge_prevout_script = fallback_address.to_script_pub_key()
+                trigger_challenge_prevout_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(self.destroyed_public_key).to_script_pub_key()
                 trigger_challenge_prevout_amount = trace_tx.outputs[0].amount
                 print(f"[FALLBACK] Using trace_tx output prevout: {trigger_challenge_prevout_amount} sats")
             else:
                 # Fallback calculation (same as trigger_execution_challenge)
-                trigger_challenge_prevout_script = fallback_address.to_script_pub_key()
+                trigger_challenge_prevout_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(self.destroyed_public_key).to_script_pub_key()
                 trigger_challenge_prevout_amount = (
                     funding_prevout_amount
                     - (
@@ -322,12 +419,14 @@ class GenerateSignaturesService:
                 )
                 print(f"[FALLBACK] Using calculated prevout: {trigger_challenge_prevout_amount} sats")
 
-            # Use P2WPKH signing path to avoid BitVMX tree recalculation
-            first_read_search_choice_signature = self.private_key.sign_input(
+            # Use Taproot signing with script_path=True
+            first_read_search_choice_signature = self.private_key.sign_taproot_input(
                 first_read_search_choice_tx,
                 0,
-                trigger_challenge_prevout_script,
-                trigger_challenge_prevout_amount
+                [trigger_challenge_prevout_script],
+                [trigger_challenge_prevout_amount],
+                script_path=True,
+                tapleaf_script=trigger_challenge_prevout_script
             )
             read_search_choice_signatures.append(first_read_search_choice_signature)
 
@@ -367,16 +466,22 @@ class GenerateSignaturesService:
                     * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
                 )
 
-                current_read_search_hash_signature = self.private_key.sign_input(
+                # Use proper Taproot address and signing
+                read_search_hash_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(self.destroyed_public_key).to_script_pub_key()
+                read_search_hash_tapleaf = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_search_scripts[i]
+                
+                current_read_search_hash_signature = self.private_key.sign_taproot_input(
                     current_read_search_hash_tx,
                     0,
-                    fallback_address.to_script_pub_key(),
-                    current_read_search_hash_prevout_amount
+                    [read_search_hash_script],  # scripts must be a list when script_path=True
+                    [current_read_search_hash_prevout_amount],  # amounts must be a list
+                    script_path=True,
+                    tapleaf_script=read_search_hash_tapleaf
                 )
                 read_search_hash_signatures.append(current_read_search_hash_signature)
-                print(f"[FALLBACK] Signed read_search_hash[{i}] with P2WPKH: {current_read_search_hash_prevout_amount} sats")
+                print(f"[TAPROOT] Signed read_search_hash[{i}] with Taproot: {current_read_search_hash_prevout_amount} sats")
 
-                # CHOICE - Use P2WPKH fallback to avoid BitVMX tree recalculation
+                # CHOICE - Use proper Taproot signing
                 current_read_search_choice_tx = bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.read_search_choice_tx_list[
                     i + 1
                 ]
@@ -395,14 +500,20 @@ class GenerateSignaturesService:
                     * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
                 )
 
-                current_read_search_choice_signature = self.private_key.sign_input(
+                # Use proper Taproot address and signing
+                read_search_choice_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(self.destroyed_public_key).to_script_pub_key()
+                read_search_choice_tapleaf = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_search_scripts[i + 1]
+                
+                current_read_search_choice_signature = self.private_key.sign_taproot_input(
                     current_read_search_choice_tx,
                     0,
-                    fallback_address.to_script_pub_key(),
-                    current_read_search_choice_prevout_amount
+                    [read_search_choice_script],  # scripts must be a list when script_path=True
+                    [current_read_search_choice_prevout_amount],  # amounts must be a list
+                    script_path=True,
+                    tapleaf_script=read_search_choice_tapleaf
                 )
                 read_search_choice_signatures.append(current_read_search_choice_signature)
-                print(f"[FALLBACK] Signed read_search_choice[{i+1}] with P2WPKH: {current_read_search_choice_prevout_amount} sats")
+                print(f"[TAPROOT] Signed read_search_choice[{i+1}] with Taproot: {current_read_search_choice_prevout_amount} sats")
 
         # read_trace signature - Use P2WPKH fallback to avoid BitVMX tree recalculation
         read_trace_prevout_amount = (
@@ -422,13 +533,19 @@ class GenerateSignaturesService:
             * bitvmx_protocol_setup_properties_dto.step_fees_satoshis
         )
 
-        read_trace_signature = self.private_key.sign_input(
+        # Use proper Taproot address and signing
+        read_trace_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_address(self.destroyed_public_key).to_script_pub_key()
+        read_trace_tapleaf = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.read_trace_script
+        
+        read_trace_signature = self.private_key.sign_taproot_input(
             bitvmx_protocol_setup_properties_dto.bitvmx_transactions_dto.read_trace_tx,
             0,
-            fallback_address.to_script_pub_key(),
-            read_trace_prevout_amount
+            [read_trace_script],  # scripts must be a list when script_path=True
+            [read_trace_prevout_amount],  # amounts must be a list
+            script_path=True,
+            tapleaf_script=read_trace_tapleaf
         )
-        print(f"[FALLBACK] Signed read_trace with P2WPKH: {read_trace_prevout_amount} sats")
+        print(f"[TAPROOT] Signed read_trace with Taproot: {read_trace_prevout_amount} sats")
 
         return BitVMXSignaturesDTO(
             hash_result_signature=hash_result_signature,

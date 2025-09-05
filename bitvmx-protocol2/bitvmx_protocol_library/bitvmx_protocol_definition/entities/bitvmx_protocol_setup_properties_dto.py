@@ -38,6 +38,8 @@ class BitVMXProtocolSetupPropertiesDTO(BaseModel):
     prover_destroyed_public_key: str
     verifier_destroyed_public_key: str
     bitvmx_protocol_properties_dto: BitVMXProtocolPropertiesDTO
+    elf_file_name: Optional[str] = None  # ELF file name for execution
+    instruction_commitment_path: Optional[str] = None  # Path to instruction commitment file
     bitvmx_bitcoin_scripts_dto: Optional[BitVMXBitcoinScriptsDTO] = None
     bitvmx_transactions_dto: Optional[BitVMXTransactionsDTO] = None
     bitvmx_prover_winternitz_public_keys_dto: Optional[BitVMXProverWinternitzPublicKeysDTO] = None

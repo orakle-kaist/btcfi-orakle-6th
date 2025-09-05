@@ -1,5 +1,4 @@
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_execution.services.execution_trace_query_service import (
     ExecutionTraceQueryService,
@@ -137,10 +136,10 @@ class PublishReadTraceTransactionService:
             public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
 
-        trace_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=read_trace_taptree,
-            index=0,
+        # Compute control block via our cached method to avoid library recomputation
+        trace_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.read_trace_script_list.get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
+            index=read_trace_script_index,
             is_odd=read_trace_script_address.is_odd(),
         )
 
@@ -150,7 +149,7 @@ class PublishReadTraceTransactionService:
                 + read_trace_witness
                 + [
                     read_trace_script.to_hex(),
-                    trace_control_block.to_hex(),
+                    trace_control_block_hex,
                 ]
             )
         )

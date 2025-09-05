@@ -1,6 +1,7 @@
 import json
 import hashlib
-from typing import Dict, List, Optional
+import pickle
+from typing import Dict, List, Optional, Any
 
 from bitcoinutils.keys import P2trAddress, PublicKey
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
@@ -128,45 +129,167 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
         # Generate fixed script trees once during initialization
         self._initialize_fixed_script_trees()
 
+    def _generate_tree_key_for_scripts(self, scripts: Any) -> str:
+        """Generate a stable tree_key for a script list structure.
+        This is computed ONCE during initialization and reused everywhere.
+        """
+        try:
+            # Use pickle to serialize the tree structure
+            serialized = pickle.dumps(scripts)
+            # Generate hash of the serialized data
+            tree_hash = hashlib.sha256(serialized).hexdigest()[:16]
+            return tree_hash
+        except Exception as e:
+            print(f"[DTO] Warning: Failed to generate tree_key via pickle: {e}")
+            # Fallback: use simple count-based key
+            if hasattr(scripts, '__len__'):
+                return f"scripts_{len(scripts)}_{id(scripts) % 1000000}"
+            return f"scripts_{id(scripts) % 1000000}"
+    
+    def _get_script_list_safe(self, obj):
+        """Safely extract script_list from an object (handles both property and method)"""
+        try:
+            # If it's already a list, return as-is
+            if isinstance(obj, list):
+                return obj
+            
+            # Try to get script_list attribute
+            if hasattr(obj, 'script_list'):
+                script_list = getattr(obj, 'script_list')
+                # If it's callable (method), call it
+                if callable(script_list):
+                    result = script_list()
+                    # Ensure result is a list
+                    return result if isinstance(result, list) else []
+                # If it's a property/list, return directly
+                elif isinstance(script_list, list):
+                    return script_list
+                # If it's a BitcoinScriptList object, try to get its script_list
+                else:
+                    print(f"[DTO] Converting BitcoinScriptList to list: {type(script_list)}")
+                    if hasattr(script_list, 'script_list'):
+                        inner_list = getattr(script_list, 'script_list')
+                        return inner_list if isinstance(inner_list, list) else []
+                    return []
+            else:
+                print(f"[DTO] No script_list attribute in {type(obj)}")
+                return []
+        except Exception as e:
+            print(f"[DTO] Error extracting script_list from {type(obj)}: {e}")
+            return []
+    
     def _initialize_fixed_script_trees(self):
         """Initialize fixed script trees once during DTO creation to ensure cache consistency"""
-        print("[DTO] Initializing fixed script trees...")
+        print("[DTO] Initializing fixed script trees with pre-generated tree_keys...")
+        
+        # CRITICAL: Set tree_keys for ALL BitcoinScriptList objects to prevent on-the-fly computation
+        # This ensures control blocks are computed consistently
+        
+        # Set tree_key for trigger_challenge_scripts
+        if hasattr(self.trigger_challenge_scripts, 'set_fixed_tree_keys'):
+            scripts = self._get_script_list_safe(self.trigger_challenge_scripts)
+            if scripts:
+                key = self._generate_tree_key_for_scripts(scripts)
+                self.trigger_challenge_scripts.set_fixed_tree_keys(key)
+                print(f"[DTO] Set tree_key for trigger_challenge_scripts: {key[:8]}")
+        
+        # Set tree_key for equivocation scripts
+        for attr_name in ['input_1_equivocation_challenge_scripts', 
+                         'input_2_equivocation_challenge_scripts',
+                         'constants_1_equivocation_challenge_scripts',
+                         'constants_2_equivocation_challenge_scripts']:
+            if hasattr(self, attr_name):
+                obj = getattr(self, attr_name)
+                if hasattr(obj, 'set_fixed_tree_keys'):
+                    scripts = self._get_script_list_safe(obj)
+                    if scripts:
+                        key = self._generate_tree_key_for_scripts(scripts)
+                        obj.set_fixed_tree_keys(key)
+                        print(f"[DTO] Set tree_key for {attr_name}: {key[:8]}")
         
         # Generate trigger_trace_challenge_scripts_list_fixed (most critical for performance)
-        self.trigger_trace_challenge_scripts_list_fixed = (
-            self.trigger_challenge_scripts
-            + self.wrong_hash_challenge_script_list.script_list()
-            + self.wrong_program_counter_challenge_scripts_list.script_list()
-            + BitcoinScriptList([self.choice_read_search_scripts[0]])
-            + self.input_1_equivocation_challenge_scripts
-            + self.input_2_equivocation_challenge_scripts
-            + self.constants_1_equivocation_challenge_scripts
-            + self.constants_2_equivocation_challenge_scripts
-            + BitcoinScriptList([self.trigger_wrong_halt_step_challenge_script])
-            + BitcoinScriptList([self.trigger_no_halt_in_halt_step_challenge_script])
-            + self.last_hash_equivocation_script_list.script_list()
-            + BitcoinScriptList([self.wrong_init_value_1_challenge_script])
-            + BitcoinScriptList([self.wrong_init_value_2_challenge_script])
-            + BitcoinScriptList([self.prover_timeout_script])
+        # First, compose all the scripts into a flat list
+        trigger_trace_scripts = (
+            self._get_script_list_safe(self.trigger_challenge_scripts)
+            + self._get_script_list_safe(self.wrong_hash_challenge_script_list)
+            + self._get_script_list_safe(self.wrong_program_counter_challenge_scripts_list)
+            + [self.choice_read_search_scripts[0]]
+            + self._get_script_list_safe(self.input_1_equivocation_challenge_scripts)
+            + self._get_script_list_safe(self.input_2_equivocation_challenge_scripts)
+            + self._get_script_list_safe(self.constants_1_equivocation_challenge_scripts)
+            + self._get_script_list_safe(self.constants_2_equivocation_challenge_scripts)
+            + [self.trigger_wrong_halt_step_challenge_script]
+            + [self.trigger_no_halt_in_halt_step_challenge_script]
+            + self._get_script_list_safe(self.last_hash_equivocation_script_list)
+            + [self.wrong_init_value_1_challenge_script]
+            + [self.wrong_init_value_2_challenge_script]
+            + [self.prover_timeout_script]
         )
+        # Generate tree_key ONCE for this fixed list
+        trigger_trace_tree_key = self._generate_tree_key_for_scripts(trigger_trace_scripts)
+        print(f"[DTO] Generated trigger_trace tree_key: {trigger_trace_tree_key} for {len(trigger_trace_scripts)} scripts")
+        # Create BitcoinScriptList with pre-computed tree_key
+        self.trigger_trace_challenge_scripts_list_fixed = BitcoinScriptList(trigger_trace_scripts)
+        self.trigger_trace_challenge_scripts_list_fixed.set_fixed_tree_keys(trigger_trace_tree_key)
         
         # Generate trigger_read_challenge_scripts_list_fixed
-        self.trigger_read_challenge_scripts_list_fixed = (
-            BitcoinScriptList(self.trigger_read_search_equivocation_scripts)
-            + BitcoinScriptList([self.trigger_wrong_trace_step_script])
-            + BitcoinScriptList([self.trigger_wrong_read_trace_step_script])
-            + self.trigger_read_wrong_hash_challenge_scripts.script_list()
-            + BitcoinScriptList([self.trigger_wrong_value_address_read_1_challenge_script])
-            + BitcoinScriptList([self.trigger_wrong_value_address_read_2_challenge_script])
-            + BitcoinScriptList([self.trigger_wrong_latter_step_1_challenge_script])
-            + BitcoinScriptList([self.trigger_wrong_latter_step_2_challenge_script])
-            + BitcoinScriptList([self.verifier_timeout_script])
+        # First, compose all the scripts into a flat list
+        trigger_read_scripts = (
+            self._get_script_list_safe(self.trigger_read_search_equivocation_scripts)
+            + [self.trigger_wrong_trace_step_script]
+            + [self.trigger_wrong_read_trace_step_script]
+            + self._get_script_list_safe(self.trigger_read_wrong_hash_challenge_scripts)
+            + [self.trigger_wrong_value_address_read_1_challenge_script]
+            + [self.trigger_wrong_value_address_read_2_challenge_script]
+            + [self.trigger_wrong_latter_step_1_challenge_script]
+            + [self.trigger_wrong_latter_step_2_challenge_script]
+            + [self.verifier_timeout_script]
         )
+        # Generate tree_key ONCE for this fixed list
+        trigger_read_tree_key = self._generate_tree_key_for_scripts(trigger_read_scripts)
+        print(f"[DTO] Generated trigger_read tree_key: {trigger_read_tree_key} for {len(trigger_read_scripts)} scripts")
+        # Create BitcoinScriptList with pre-computed tree_key
+        self.trigger_read_challenge_scripts_list_fixed = BitcoinScriptList(trigger_read_scripts)
+        self.trigger_read_challenge_scripts_list_fixed.set_fixed_tree_keys(trigger_read_tree_key)
         
         # Generate other fixed lists for completeness
         self.trace_script_list_fixed = self.execution_challenge_script_list
-        self.read_trace_script_list_fixed = BitcoinScriptList([self.read_trace_script, self.verifier_timeout_script])
-        self.trigger_protocol_scripts_list_fixed = BitcoinScriptList([self.trigger_protocol_script, self.verifier_timeout_script])
+        
+        # Set tree_key for execution_challenge_script_list (BitVMXExecutionScriptList)
+        if hasattr(self.execution_challenge_script_list, 'set_fixed_tree_keys'):
+            exec_key = self._generate_tree_key_for_scripts(self.execution_challenge_script_list.key_list)
+            self.execution_challenge_script_list.set_fixed_tree_keys(exec_key)
+            print(f"[DTO] Set tree_key for execution_challenge_script_list: {exec_key[:8]}")
+        
+        # Set tree_key for other special script lists
+        for attr_name in ['wrong_hash_challenge_script_list', 
+                         'last_hash_equivocation_script_list',
+                         'wrong_program_counter_challenge_scripts_list',
+                         'trigger_read_wrong_hash_challenge_scripts']:
+            if hasattr(self, attr_name):
+                obj = getattr(self, attr_name)
+                if hasattr(obj, 'set_fixed_tree_keys'):
+                    # These objects might have different structures
+                    if hasattr(obj, 'key_list'):
+                        key = self._generate_tree_key_for_scripts(obj.key_list)
+                    elif hasattr(obj, 'script_list'):
+                        key = self._generate_tree_key_for_scripts(obj.script_list)
+                    else:
+                        key = self._generate_tree_key_for_scripts(str(obj))
+                    obj.set_fixed_tree_keys(key)
+                    print(f"[DTO] Set tree_key for {attr_name}: {key[:8]}")
+        
+        # Generate tree_key for read_trace_script_list
+        read_trace_scripts = [self.read_trace_script, self.verifier_timeout_script]
+        read_trace_tree_key = self._generate_tree_key_for_scripts(read_trace_scripts)
+        self.read_trace_script_list_fixed = BitcoinScriptList(read_trace_scripts)
+        self.read_trace_script_list_fixed.set_fixed_tree_keys(read_trace_tree_key)
+        
+        # Generate tree_key for trigger_protocol_scripts_list
+        trigger_protocol_scripts = [self.trigger_protocol_script, self.verifier_timeout_script]
+        trigger_protocol_tree_key = self._generate_tree_key_for_scripts(trigger_protocol_scripts)
+        self.trigger_protocol_scripts_list_fixed = BitcoinScriptList(trigger_protocol_scripts)
+        self.trigger_protocol_scripts_list_fixed.set_fixed_tree_keys(trigger_protocol_tree_key)
         
         # Generate tree fingerprint for cache key and debugging
         self._generate_tree_fingerprint()
@@ -189,25 +312,33 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
         self.tree_fingerprint = hashlib.sha256(combined.encode()).hexdigest()[:32]
 
     def hash_search_scripts_list(self, iteration: int) -> BitcoinScriptList:
-        return BitcoinScriptList([self.hash_search_scripts[iteration], self.prover_timeout_script])
+        scripts = [self.hash_search_scripts[iteration], self.prover_timeout_script]
+        script_list = BitcoinScriptList(scripts)
+        tree_key = self._generate_tree_key_for_scripts(scripts)
+        script_list.set_fixed_tree_keys(tree_key)
+        return script_list
 
     @staticmethod
     def hash_search_script_index():
         return 0
 
     def choice_search_scripts_list(self, iteration: int) -> BitcoinScriptList:
-        return BitcoinScriptList(
-            [self.choice_search_scripts[iteration], self.verifier_timeout_script]
-        )
+        scripts = [self.choice_search_scripts[iteration], self.verifier_timeout_script]
+        script_list = BitcoinScriptList(scripts)
+        tree_key = self._generate_tree_key_for_scripts(scripts)
+        script_list.set_fixed_tree_keys(tree_key)
+        return script_list
 
     @staticmethod
     def choice_search_script_index():
         return 0
 
     def hash_read_search_scripts_list(self, iteration: int) -> BitcoinScriptList:
-        return BitcoinScriptList(
-            [self.hash_read_search_scripts[iteration], self.prover_timeout_script]
-        )
+        scripts = [self.hash_read_search_scripts[iteration], self.prover_timeout_script]
+        script_list = BitcoinScriptList(scripts)
+        tree_key = self._generate_tree_key_for_scripts(scripts)
+        script_list.set_fixed_tree_keys(tree_key)
+        return script_list
 
     @staticmethod
     def hash_read_search_script_index():
@@ -326,22 +457,26 @@ class BitVMXBitcoinScriptsDTO(BaseModel):
 
     def choice_read_search_script_list(self, iteration: int) -> BitcoinScriptList:
         assert iteration > 0
-        return BitcoinScriptList(
-            [
-                self.choice_read_search_scripts[iteration],
-                self.trigger_read_search_equivocation_scripts[iteration - 1],
-                self.verifier_timeout_script,
-            ]
-        )
+        scripts = [
+            self.choice_read_search_scripts[iteration],
+            self.trigger_read_search_equivocation_scripts[iteration - 1],
+            self.verifier_timeout_script,
+        ]
+        script_list = BitcoinScriptList(scripts)
+        tree_key = self._generate_tree_key_for_scripts(scripts)
+        script_list.set_fixed_tree_keys(tree_key)
+        return script_list
 
     def hash_read_search_script_list(self, iteration: int) -> BitcoinScriptList:
         assert iteration > 0
-        return BitcoinScriptList(
-            [
-                self.hash_read_search_scripts[iteration - 1],
-                self.prover_timeout_script,
-            ]
-        )
+        scripts = [
+            self.hash_read_search_scripts[iteration - 1],
+            self.prover_timeout_script,
+        ]
+        script_list = BitcoinScriptList(scripts)
+        tree_key = self._generate_tree_key_for_scripts(scripts)
+        script_list.set_fixed_tree_keys(tree_key)
+        return script_list
 
     def trigger_challenge_taptree(self):
         return self.trigger_trace_challenge_scripts_list.to_scripts_tree()

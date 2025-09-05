@@ -5,12 +5,14 @@ Handles broadcasting of BitVMX protocol transactions
 from typing import List, Dict, Any
 from collections import defaultdict, deque, OrderedDict
 import hashlib
+import time
+import requests
 from prover_app.common.hexsafe import ensure_hex_str, bfromhex_safe, hex_from_any
 
 # Import bitcoin signing utilities at module level
 try:
     from bitcoin.core import CMutableTransaction, CTxWitness, CTxInWitness, Hash160
-    from bitcoin.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SIGHASH_ALL, SignatureHash, SIGVERSION_WITNESS_V0
+    from bitcoin.core.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, OP_1, SIGHASH_ALL, SignatureHash, SIGVERSION_WITNESS_V0
     from bitcoin.wallet import CBitcoinSecret
     import bitcoin
     BITCOIN_LIB_AVAILABLE = True
@@ -151,6 +153,28 @@ def _collect_broadcast_list(txdto) -> List[Any]:
             lst.append(v)
     return lst
 
+def _wait_for_mempool_propagation(txid: str, network: str = "mutinynet", max_wait: int = 30) -> bool:
+    """Wait for transaction to appear in mempool"""
+    if network == "mutinynet":
+        api_url = f"https://mutinynet.com/api/tx/{txid}"
+    elif network == "testnet":
+        api_url = f"https://mempool.space/testnet/api/tx/{txid}"
+    else:
+        api_url = f"https://mempool.space/api/tx/{txid}"
+    
+    for i in range(max_wait):
+        try:
+            response = requests.get(api_url, timeout=5)
+            if response.status_code == 200:
+                print(f"[BROADCAST] Transaction {txid[:8]}... found in mempool")
+                return True
+            print(f"[BROADCAST] Waiting for mempool... ({i+1}/{max_wait})")
+        except Exception:
+            pass
+        time.sleep(1)
+    
+    return False
+
 def broadcast_protocol_transactions(
     setup_uuid: str,
     persistence,  # bitvmx_protocol_setup_properties_dto_persistence
@@ -180,25 +204,80 @@ def broadcast_protocol_transactions(
     # Initialize tx_hexes list for collecting transactions
     tx_hexes = []
     
-    # Skip loading from file if force resign is enabled
-    if force_resign:
-        print(f"[BROADCAST] Force resign enabled, skipping cached transactions")
-        signed_transactions = None
-        # Clear the flag after use
-        os.environ.pop("BITVMX_FORCE_RESIGN", None)
-    else:
+    # Get DTO first to check prevout consistency
+    dto = persistence.get(setup_uuid=setup_uuid)
+    if not dto:
+        raise ValueError(f"No setup found for setup_uuid={setup_uuid}")
+    
+    # Check if cached transactions have correct prevout
+    needs_resign = force_resign
+    
+    # Get chain prevout info for validation
+    from blockchain_query_services.services.mutinynet_api.transaction_info_service import TransactionInfoService
+    
+    expected_funding_txid = dto.funding_tx_id.lower()
+    expected_funding_index = dto.funding_index
+    expected_script = None
+    expected_amount = None
+    
+    # Query chain for actual prevout details
+    try:
+        tx_info_service = TransactionInfoService()
+        funding_tx_info = tx_info_service(tx_id=expected_funding_txid)
+        if expected_funding_index < len(funding_tx_info.outputs):
+            funding_output = funding_tx_info.outputs[expected_funding_index]
+            expected_script = funding_output.scriptpubkey_hex
+            expected_amount = funding_output.value
+            print(f"[BROADCAST] Expected prevout: {expected_funding_txid}:{expected_funding_index}")
+            print(f"[BROADCAST] Chain prevout script: {expected_script}, amount: {expected_amount}")
+    except Exception as e:
+        print(f"[BROADCAST] Failed to query chain prevout: {e}")
+    
+    if not needs_resign:
+        # Load cached transactions to check prevout
         signed_transactions = apply_signatures_service.load_signed_transactions(
             setup_uuid=setup_uuid,
             base_dir="prover_files"
         )
-    
-    if not signed_transactions:
-        print(f"[BROADCAST] No signed transactions found for {setup_uuid}, regenerating signatures")
         
-        # Get setup DTO from persistence
-        dto = persistence.get(setup_uuid=setup_uuid)
-        if not dto:
-            raise ValueError(f"No setup found for setup_uuid={setup_uuid}")
+        if signed_transactions:
+            # Check cache info for prevout validation
+            cache_info = signed_transactions.get('cache_info', {})
+            cached_txid = cache_info.get('funding_tx_id', '').lower()
+            cached_index = cache_info.get('funding_index', -1)
+            cached_script = cache_info.get('prevout_script', '')
+            cached_amount = cache_info.get('prevout_amount', -1)
+            
+            # Validate cache against current expectations
+            if (cached_txid != expected_funding_txid or 
+                cached_index != expected_funding_index or
+                (expected_script and cached_script != expected_script) or
+                (expected_amount and cached_amount != expected_amount)):
+                print(f"[BROADCAST] Cache mismatch detected!")
+                print(f"[BROADCAST] Expected: txid={expected_funding_txid}, index={expected_funding_index}")
+                print(f"[BROADCAST] Cached:   txid={cached_txid}, index={cached_index}")
+                print(f"[BROADCAST] DETAILS: Script mismatch: {cached_script != expected_script}")
+                print(f"  - Expected Script: {expected_script}")
+                print(f"  - Cached Script:   {cached_script}")
+                print(f"[BROADCAST] DETAILS: Amount mismatch: {cached_amount != expected_amount}")
+                print(f"  - Expected Amount: {expected_amount}")
+                print(f"  - Cached Amount:   {cached_amount}")
+                print(f"[BROADCAST] Forcing re-sign due to prevout change")
+                needs_resign = True
+                signed_transactions = None
+            else:
+                print(f"[BROADCAST] Cache prevout matches expected")
+    else:
+        print(f"[BROADCAST] Force resign enabled, skipping cached transactions")
+        signed_transactions = None
+        # Clear the flag after use
+        os.environ.pop("BITVMX_FORCE_RESIGN", None)
+    
+    if not signed_transactions or needs_resign:
+        if needs_resign:
+            print(f"[BROADCAST] Regenerating signatures due to prevout change or force flag")
+        else:
+            print(f"[BROADCAST] No signed transactions found for {setup_uuid}, regenerating signatures")
         
         if not hasattr(dto, "bitvmx_transactions_dto") or not dto.bitvmx_transactions_dto:
             raise ValueError(f"No transactions to broadcast for setup_uuid={setup_uuid}")
@@ -281,12 +360,17 @@ def broadcast_protocol_transactions(
             # Load prover DTO for input_hex and verifier signatures
             prover_dto_path = f"prover_files/{setup_uuid}/bitvmx_protocol_prover_dto.json"
             prover_dto = None
+            print(f"[BROADCAST DEBUG] Looking for prover DTO at: {prover_dto_path}")
+            print(f"[BROADCAST DEBUG] File exists: {os.path.exists(prover_dto_path)}")
             if os.path.exists(prover_dto_path):
                 with open(prover_dto_path, 'r') as f:
                     prover_dto_dict = json.load(f)
+                    print(f"[BROADCAST DEBUG] Loaded dict with keys: {list(prover_dto_dict.keys())[:5]}")
+                    print(f"[BROADCAST DEBUG] Dict input_hex: {prover_dto_dict.get('input_hex')}")
                     # Convert dict to DTO
                     from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_prover_dto import BitVMXProtocolProverDTO
                     prover_dto = BitVMXProtocolProverDTO(**prover_dto_dict)
+                    print(f"[BROADCAST DEBUG] DTO created, input_hex: {prover_dto.input_hex}")
                     print(f"[BROADCAST] Loaded prover DTO with input_hex: {prover_dto.input_hex is not None}")
             
             if prover_dto and hasattr(dto, 'bitvmx_transactions_dto') and dto.bitvmx_transactions_dto:
@@ -316,25 +400,57 @@ def broadcast_protocol_transactions(
                     
                 except Exception as e:
                     print(f"[BROADCAST] Failed to build hash_result_tx with PublishHashTransactionService: {e}")
-                    # Fall back to regular signing
-                    signed_transactions = apply_signatures_service.apply_signatures_with_private_key(
-                        bitvmx_protocol_setup_properties_dto=dto,
-                        bitvmx_signatures_dto=signatures,
-                        bitvmx_verifier_signatures_dto=signatures.verifier_signatures_dto if hasattr(signatures, 'verifier_signatures_dto') else None,
-                        prover_private_key_hex=signing_private_key
-                    )
+                    # If input is required but missing, abort early with clear status
+                    try:
+                        needs_input = (
+                            dto.bitvmx_protocol_properties_dto.amount_of_input_words > 0 and
+                            (getattr(signatures, 'prover_signatures_dto', None) is None or
+                             getattr(dto, 'bitvmx_protocol_prover_dto', None) is None or
+                             getattr(dto.bitvmx_protocol_prover_dto, 'input_hex', None) in (None, ''))
+                        )
+                    except Exception:
+                        needs_input = False
+                    if 'Input should be set' in str(e) or needs_input:
+                        print("[BROADCAST] CRITICAL: input_hex is required to publish hash_result_tx. Aborting next_step.")
+                        return {
+                            "setup_uuid": setup_uuid,
+                            "broadcasted_count": 0,
+                            "broadcasted_txids": [],
+                            "skipped_count": 0,
+                            "skipped_txids": [],
+                            "failed_count": 0,
+                            "failed_txs": [],
+                            "status": "input_missing",
+                            "message": "Input is required (input_hex not set). Set input via API and retry next_step."
+                        }
+                    # Do NOT fall back to minimal witness for hash_result (would cause OP_EQUALVERIFY)
+                    print("[BROADCAST] Aborting: hash_result_tx build failed for non-input reason. No unsafe fallback.")
+                    return {
+                        "setup_uuid": setup_uuid,
+                        "broadcasted_count": 0,
+                        "broadcasted_txids": [],
+                        "skipped_count": 0,
+                        "skipped_txids": [],
+                        "failed_count": 0,
+                        "failed_txs": [],
+                        "status": "hash_build_failed",
+                        "message": f"PublishHashTransactionService failed: {e}"
+                    }
             else:
                 # Fall back to regular signing if no prover DTO
                 print(f"[BROADCAST] No prover DTO found, using regular signature application")
                 signed_transactions = apply_signatures_service.apply_signatures_with_private_key(
                     bitvmx_protocol_setup_properties_dto=dto,
                     bitvmx_signatures_dto=signatures,
-                    bitvmx_verifier_signatures_dto=signatures.verifier_signatures_dto if hasattr(signatures, 'verifier_signatures_dto') else None,
+                    bitvmx_verifier_signatures_dto=signatures.verifier_signatures_dto,
                     prover_private_key_hex=signing_private_key
                 )
             
             # Apply signatures to other transactions (trigger, search, etc)
             if signed_transactions and "hash_result_tx" in signed_transactions:
+                # Save our correctly built hash_result_tx
+                our_hash_result_tx = signed_transactions["hash_result_tx"]
+                
                 # Apply signatures to remaining transactions
                 other_signed = apply_signatures_service.apply_signatures_with_private_key(
                     bitvmx_protocol_setup_properties_dto=dto,
@@ -342,24 +458,33 @@ def broadcast_protocol_transactions(
                     bitvmx_verifier_signatures_dto=signatures.verifier_signatures_dto if hasattr(signatures, 'verifier_signatures_dto') else None,
                     prover_private_key_hex=signing_private_key
                 )
-                # Merge with hash_result_tx
+                # CRITICAL: Always use our hash_result_tx, not the one from apply_signatures_service
                 if other_signed:
-                    other_signed["hash_result_tx"] = signed_transactions["hash_result_tx"]
+                    # Keep our hash_result_tx, replace theirs
+                    other_signed["hash_result_tx"] = our_hash_result_tx
                     signed_transactions = other_signed
+                    print(f"[BROADCAST] Preserved our hash_result_tx with complete witness")
             
             print(f"[BROADCAST] All signatures applied successfully")
         else:
             print(f"[BROADCAST] ERROR: No private key available for signing")
             signed_transactions = {}
         
-        # Save to file for future use
+        # Save to file for future use with cache info
         if signed_transactions:
+            # Add cache info for validation
+            signed_transactions['cache_info'] = {
+                'funding_tx_id': expected_funding_txid,
+                'funding_index': expected_funding_index,
+                'prevout_script': expected_script or '',
+                'prevout_amount': expected_amount or 0
+            }
             apply_signatures_service.save_signed_transactions(
                 setup_uuid=setup_uuid,
                 signed_transactions=signed_transactions,
                 base_dir="prover_files"
             )
-            print(f"[BROADCAST] Signatures regenerated and saved")
+            print(f"[BROADCAST] Signatures regenerated and saved with cache info")
             
             # CRITICAL: Use the SIGNED transactions, not the unsigned dto.serialize()!
             print(f"[BROADCAST] Using regenerated signed transactions")
@@ -396,7 +521,11 @@ def broadcast_protocol_transactions(
             for tx in candidates:
                 if isinstance(tx, str):
                     tx_hexes.append(ensure_hex_str(tx))
+                elif hasattr(tx, "to_hex"):
+                    # Prefer to_hex() which includes witness data
+                    tx_hexes.append(ensure_hex_str(tx.to_hex()))
                 elif hasattr(tx, "serialize"):
+                    # Fallback to serialize() if to_hex() not available
                     tx_hexes.append(ensure_hex_str(tx.serialize()))
                 else:
                     print(f"[BROADCAST] Warning: Cannot serialize transaction {type(tx)}")
@@ -412,7 +541,7 @@ def broadcast_protocol_transactions(
                     for tx in tx_list:
                         tx_hexes.append(ensure_hex_str(tx))
         
-        # Process single transactions
+        # Process single transactions (EXCLUDE funding_tx here, handle it separately as parent)
         for key in ["hash_result_tx", "trigger_protocol_tx", "trigger_trace_challenge_tx"]:
             if key in signed_transactions:
                 tx_hexes.append(ensure_hex_str(signed_transactions[key]))
@@ -448,18 +577,9 @@ def broadcast_protocol_transactions(
     if funding_txid_cfg:
         funding_txid_cfg = funding_txid_cfg.lower()
     
-    # Only attempt to broadcast synthetic funding_tx if we're using it (legacy path)
-    # Skip this for actual on-chain UTXOs as they're already confirmed
-    # NO_FAUCET mode: Always try to broadcast funding_tx
-    import os
-    no_faucet = os.environ.get("NO_FAUCET", "true").lower() == "true"
-    
-    if no_faucet:
-        print(f"[BROADCAST] NO_FAUCET mode - will attempt to broadcast funding_tx")
-    
-    if dto and hasattr(dto, "funding_tx_id") and dto.funding_tx_id == funding_txid_cfg and not no_faucet:
-        print(f"[BROADCAST] Skipping synthetic funding_tx broadcast - using actual on-chain UTXO")
-    elif dto and hasattr(dto, "bitvmx_transactions_dto") and dto.bitvmx_transactions_dto:
+    # Always attempt to broadcast funding_tx first (parent-first principle)
+    # If already broadcast, we'll get "already known" error which is fine
+    if dto and hasattr(dto, "bitvmx_transactions_dto") and dto.bitvmx_transactions_dto:
         try:
             ftx = getattr(dto.bitvmx_transactions_dto, "funding_tx", None)
             if ftx:
@@ -478,29 +598,98 @@ def broadcast_protocol_transactions(
                             # Get private key from environment
                             priv_key_hex = _os2.environ.get("PROVER_PRIVATE_KEY")
                             if priv_key_hex:
-                                # Create private key object
-                                privkey = CBitcoinSecret.from_secret_bytes(bytes.fromhex(priv_key_hex), compressed=True)
-                                pubkey = privkey.pub
+                                # Check if transaction is already signed (has witness data)
+                                # Signed transactions are typically >400 chars for simple P2WPKH
+                                if len(ftx_hex) > 400 and "0247304402" in ftx_hex:  # Contains signature pattern
+                                    print(f"[BROADCAST] Funding TX is already signed (length: {len(ftx_hex)}), broadcasting directly")
+                                    # Transaction is already signed, broadcast as-is
+                                    pass
+                                else:
+                                    # Create private key object
+                                    privkey = CBitcoinSecret.from_secret_bytes(bytes.fromhex(priv_key_hex), compressed=True)
+                                    pubkey = privkey.pub
+                                    
+                                    # Parse the unsigned transaction
+                                    tx = CMutableTransaction.deserialize(bytes.fromhex(ftx_hex))
                                 
-                                # Parse the unsigned transaction
-                                tx = CMutableTransaction.deserialize(bytes.fromhex(ftx_hex))
+                                # CRITICAL: Get exact input UTXO amount from blockchain
+                                # BIP143 requires the exact input amount, not output amount
+                                input_amount = None
+                                try:
+                                    # Get funding tx details from DTO
+                                    funding_tx_id = dto.funding_tx_id
+                                    funding_index = dto.funding_index
+                                    
+                                    # Import correct transaction info service (mutinynet)
+                                    from blockchain_query_services.services.mutinynet_api.transaction_info_service import TransactionInfoService
+                                    tx_info_service = TransactionInfoService()
+                                    
+                                    # Get the actual UTXO from chain
+                                    funding_tx_info = tx_info_service(tx_id=funding_tx_id)
+                                    if funding_index < len(funding_tx_info.outputs):
+                                        input_amount = funding_tx_info.outputs[funding_index].value
+                                        print(f"[BROADCAST] Got exact input UTXO amount from chain: {input_amount} sats")
+                                    else:
+                                        print(f"[BROADCAST] ERROR: Invalid funding index {funding_index}")
+                                        raise ValueError(f"Funding index {funding_index} out of range")
+                                except Exception as e:
+                                    print(f"[BROADCAST] ERROR: Failed to get exact UTXO amount: {e}")
+                                    # This is critical - we cannot sign without exact amount
+                                    print(f"[BROADCAST] Cannot sign funding_tx without exact input amount")
+                                    input_amount = None
                                 
-                                # Create signature for P2WPKH input
-                                witness_program = Hash160(pubkey)
-                                script_for_sig = CScript([OP_DUP, OP_HASH160, witness_program, OP_EQUALVERIFY, OP_CHECKSIG])
-                                
-                                # Assume 10M sats input (we know this from the UTXO)
-                                input_amount = 10000000
-                                sighash = SignatureHash(script_for_sig, tx, 0, SIGHASH_ALL, 
-                                                      amount=input_amount, sigversion=SIGVERSION_WITNESS_V0)
-                                
-                                # Sign and add witness
-                                sig = privkey.sign(sighash) + bytes([SIGHASH_ALL])
-                                tx.wit = CTxWitness([CTxInWitness([sig, pubkey])])
-                                
-                                # Get signed hex
-                                ftx_hex = tx.serialize().hex()
-                                print(f"[BROADCAST] Funding TX signed successfully (len={len(ftx_hex)})")
+                                    if input_amount is None:
+                                        print(f"[BROADCAST] Skipping funding_tx signature due to missing input amount")
+                                        ftx_hex = tx.serialize().hex()  # Keep unsigned version
+                                    else:
+                                        # Detect input type based on address prefix
+                                        prover_address = _os2.environ.get("PROVER_ADDRESS", "")
+                                        
+                                        if prover_address.startswith("tb1q"):
+                                            # P2WPKH signing (tb1q...)
+                                            print(f"[BROADCAST] Detected P2WPKH address, using BIP143 signing")
+                                            witness_program = Hash160(pubkey)
+                                            script_for_sig = CScript([OP_DUP, OP_HASH160, witness_program, OP_EQUALVERIFY, OP_CHECKSIG])
+                                            
+                                            sighash = SignatureHash(script_for_sig, tx, 0, SIGHASH_ALL, 
+                                                                  amount=input_amount, sigversion=SIGVERSION_WITNESS_V0)
+                                            
+                                            # Sign and add witness
+                                            sig = privkey.sign(sighash) + bytes([SIGHASH_ALL])
+                                            tx.wit = CTxWitness([CTxInWitness([sig, pubkey])])
+                                        
+                                        elif prover_address.startswith("tb1p"):
+                                            # P2TR signing (tb1p...) - Taproot key path
+                                            print(f"[BROADCAST] Detected P2TR address, using Taproot key-path signing")
+                                            from bitcoin.core.script import SIGHASH_DEFAULT, TaprootSignatureHash
+                                            
+                                            # For key-path spending, we need taproot sighash
+                                            sighash = TaprootSignatureHash(
+                                                txTo=tx, 
+                                                spent_utxos=[(input_amount, CScript([OP_1, pubkey[1:]]))],  # P2TR scriptPubKey
+                                                hash_type=SIGHASH_DEFAULT,
+                                                input_index=0
+                                            )
+                                            
+                                            # Schnorr signature (64 bytes, no sighash byte for DEFAULT)
+                                            sig = privkey.sign_schnorr(sighash)
+                                            tx.wit = CTxWitness([CTxInWitness([sig])])
+                                            
+                                        else:
+                                            # Default to P2WPKH if unknown
+                                            print(f"[BROADCAST] Unknown address type, defaulting to P2WPKH")
+                                            witness_program = Hash160(pubkey)
+                                            script_for_sig = CScript([OP_DUP, OP_HASH160, witness_program, OP_EQUALVERIFY, OP_CHECKSIG])
+                                            
+                                            sighash = SignatureHash(script_for_sig, tx, 0, SIGHASH_ALL, 
+                                                                  amount=input_amount, sigversion=SIGVERSION_WITNESS_V0)
+                                            
+                                            sig = privkey.sign(sighash) + bytes([SIGHASH_ALL])
+                                            tx.wit = CTxWitness([CTxInWitness([sig, pubkey])])
+                                        
+                                        # Get signed hex
+                                        ftx_hex = tx.serialize().hex()
+                                        print(f"[BROADCAST] Funding TX signed successfully (len={len(ftx_hex)})")
                             else:
                                 print(f"[BROADCAST] No PROVER_PRIVATE_KEY found, using unsigned tx")
                         except Exception as sign_e:
@@ -509,21 +698,42 @@ def broadcast_protocol_transactions(
                     else:
                         print(f"[BROADCAST] Bitcoin library not available, cannot sign funding TX")
                 
-                print(f"[BROADCAST] Proactive parent broadcast: synthetic funding_tx (len={len(ftx_hex)})")
-                try:
-                    broadcast_service(transaction=ftx_hex)
-                    print(f"[BROADCAST] Parent funding_tx broadcast attempted")
-                except Exception as e:
-                    em = str(e).lower()
-                    if any(k in em for k in [
-                        "already in block chain",
-                        "txn-already-in-mempool",
-                        "already have transaction",
-                        "already known",
-                    ]):
-                        print(f"[BROADCAST] Parent funding_tx seems already known: {e}")
-                    else:
-                        print(f"[BROADCAST] Parent funding_tx broadcast error (ignored for retry loop): {e}")
+                # Check if wrapper TX is already confirmed before trying to broadcast
+                wrapper_txid = _get_txid(ftx_hex)
+                if wrapper_txid:
+                    try:
+                        # Check if already confirmed
+                        import requests
+                        check_url = f"https://mutinynet.com/api/tx/{wrapper_txid}"
+                        resp = requests.get(check_url, timeout=5)
+                        if resp.status_code == 200:
+                            tx_data = resp.json()
+                            if tx_data.get("status", {}).get("confirmed", False):
+                                print(f"[BROADCAST] Wrapper TX {wrapper_txid[:8]}... already confirmed, skipping broadcast")
+                            else:
+                                print(f"[BROADCAST] Wrapper TX {wrapper_txid[:8]}... found but unconfirmed, will try broadcast")
+                                # Only broadcast synthetic funding_tx if explicitly enabled (for faucet mode)
+                                import os
+                                if os.environ.get("BITVMX_BROADCAST_FUNDING") == "1":
+                                    try:
+                                        broadcast_service(transaction=ftx_hex)
+                                        print(f"[BROADCAST] Parent funding_tx broadcast attempted")
+                                    except Exception as e:
+                                        print(f"[BROADCAST] Parent funding_tx broadcast error: {e}")
+                        else:
+                            # TX not found, try to broadcast
+                            print(f"[BROADCAST] Wrapper TX not found on chain, attempting broadcast...")
+                            import os
+                            if os.environ.get("BITVMX_BROADCAST_FUNDING") == "1":
+                                try:
+                                    broadcast_service(transaction=ftx_hex)
+                                    print(f"[BROADCAST] Parent funding_tx broadcast attempted")
+                                except Exception as e:
+                                    print(f"[BROADCAST] Parent funding_tx broadcast error: {e}")
+                    except Exception as e:
+                        print(f"[BROADCAST] Could not check wrapper TX status: {e}")
+                else:
+                    print(f"[BROADCAST] Skipping synthetic funding_tx broadcast (using external UTXO)")
         except Exception as e:
             print(f"[BROADCAST] Unexpected error preparing parent broadcast: {e}")
 
@@ -572,6 +782,164 @@ def broadcast_protocol_transactions(
             if not funding_confirmed:
                 print(f"[BROADCAST] WARNING: Funding_tx {funding_txid_cfg} not confirmed; proceeding due to outage")
     
+    # Check if funding UTXO is already Taproot (no wrapper needed)
+    # IMPORTANT: In no-faucet mode, the wrapper TX creates a Taproot output
+    # If the current funding_tx_id is the wrapper TX (already broadcasted), it IS Taproot
+    is_taproot_utxo = False
+    
+    # First, check if this is a wrapper TX that was already created and confirmed
+    if dto and hasattr(dto, "funding_tx_id"):
+        current_funding_txid = dto.funding_tx_id
+        # Check if this funding TX is already confirmed
+        try:
+            import requests
+            check_url = f"https://mutinynet.com/api/tx/{current_funding_txid}"
+            resp = requests.get(check_url, timeout=5)
+            if resp.status_code == 200:
+                tx_data = resp.json()
+                if tx_data.get("status", {}).get("confirmed", False):
+                    # TX is confirmed, check if it's a Taproot output
+                    if "vout" in tx_data and expected_funding_index < len(tx_data["vout"]):
+                        scriptpubkey = tx_data["vout"][expected_funding_index].get("scriptpubkey", "")
+                        if scriptpubkey.startswith('5120'):  # Taproot (OP_1 + 32 bytes)
+                            is_taproot_utxo = True
+                            print(f"[BROADCAST] Funding TX {current_funding_txid[:8]}... is confirmed Taproot (wrapper already done)")
+                        else:
+                            print(f"[BROADCAST] Funding TX is confirmed but not Taproot: {scriptpubkey[:10]}...")
+                else:
+                    print(f"[BROADCAST] Funding TX {current_funding_txid[:8]}... exists but unconfirmed")
+        except Exception as e:
+            print(f"[BROADCAST] Could not check current funding TX status: {e}")
+    
+    # Fallback: Check using transaction info service
+    if not is_taproot_utxo:
+        try:
+            from blockchain_query_services.services.mutinynet_api.transaction_info_service import TransactionInfoService
+            tx_info_service = TransactionInfoService()
+            funding_info = tx_info_service(tx_id=expected_funding_txid)
+            if expected_funding_index < len(funding_info.outputs):
+                scriptpubkey = funding_info.outputs[expected_funding_index].scriptpubkey
+                if scriptpubkey and scriptpubkey.startswith('5120'):  # Taproot
+                    is_taproot_utxo = True
+                    print(f"[BROADCAST] Funding UTXO is already Taproot, skipping wrapper TX")
+        except Exception as e:
+            print(f"[BROADCAST] Could not check funding UTXO type via service: {e}")
+    
+    # CRITICAL: Broadcast funding_tx (wrapper) FIRST if it exists and needed
+    # This wraps P2WPKH UTXO to Taproot for BitVMX compatibility
+    funding_broadcasted = False
+    if not is_taproot_utxo and 'funding_tx' in signed_transactions:
+        funding_hex = ensure_hex_str(signed_transactions['funding_tx'])
+        if funding_hex and len(funding_hex) > 100:  # Valid signed tx should be >100 chars
+            try:
+                print(f"[BROADCAST] Broadcasting funding_tx (wrapper) FIRST...")
+                print(f"[BROADCAST] Funding TX hex length: {len(funding_hex)} chars")
+                broadcast_service(transaction=funding_hex)
+                funding_broadcasted = True
+                print(f"[BROADCAST] SUCCESS: funding_tx (wrapper) broadcast completed")
+                # Wait for wrapper to propagate
+                wrapper_txid = _get_txid(funding_hex)
+                if wrapper_txid:
+                    print(f"[BROADCAST] Waiting for wrapper TX {wrapper_txid[:8]}... to propagate")
+                    if not _wait_for_mempool_propagation(wrapper_txid):
+                        print(f"[BROADCAST] ERROR: Wrapper TX not found in mempool after 30s")
+                        return {
+                            "setup_uuid": setup_uuid,
+                            "broadcasted_count": 0,
+                            "skipped_count": 0,
+                            "failed_count": 1,
+                            "error": "wrapper_not_propagated",
+                            "message": "Wrapper transaction failed to propagate to mempool"
+                        }
+                
+                # Give mempool time to propagate
+                import time as _time
+                _time.sleep(2)
+                
+            except Exception as e:
+                error_msg = str(e).lower()
+                if any(phrase in error_msg for phrase in [
+                    "already in block chain",
+                    "txn-already-in-mempool", 
+                    "txn-mempool-conflict",
+                    "already have transaction"
+                ]):
+                    print(f"[BROADCAST] funding_tx already in mempool/chain (good)")
+                    funding_broadcasted = True
+                else:
+                    print(f"[BROADCAST] WARNING: Failed to broadcast funding_tx: {e}")
+        else:
+            print(f"[BROADCAST] WARNING: Invalid or missing funding_tx hex")
+    
+    # Fallback: Try from DTO if not in signed_transactions
+    # IMPORTANT: Skip if is_taproot_utxo is True (wrapper already done)
+    if not funding_broadcasted and not is_taproot_utxo:
+        try:
+            from os import getenv as _getenv
+            auto_broadcast_funding = _getenv("BITVMX_BROADCAST_FUNDING", "1") == "1"
+            if auto_broadcast_funding and dto and hasattr(dto, 'bitvmx_transactions_dto') and dto.bitvmx_transactions_dto:
+                ftx_obj = getattr(dto.bitvmx_transactions_dto, 'funding_tx', None)
+                if ftx_obj:
+                    try:
+                        # Ensure a minimal fee for funding wrapper
+                        try:
+                            from math import ceil
+                            def _estimate_vsize_from_hex(tx_hex: str) -> int:
+                                try:
+                                    b = bytes.fromhex(tx_hex)
+                                    segwit = len(b) > 6 and b[4] == 0x00 and b[5] == 0x01
+                                    return ceil(len(b) * 0.75) if segwit else len(b)
+                                except Exception:
+                                    return 180
+                            min_sat_vb = int(_getenv('FUNDING_MIN_SAT_VB', '3'))
+                        except Exception:
+                            min_sat_vb = 3
+                        # If we know prevout amount, reduce output to pay min fee
+                        if expected_amount and hasattr(ftx_obj, 'outputs') and ftx_obj.outputs:
+                            provisional_hex = ensure_hex_str(ftx_obj.to_hex() if hasattr(ftx_obj, 'to_hex') else '')
+                            vsize = _estimate_vsize_from_hex(provisional_hex) if provisional_hex else 180
+                            need_fee = vsize * min_sat_vb
+                            target_amount = max(0, int(expected_amount) - int(need_fee))
+                            if ftx_obj.outputs[0].amount > target_amount:
+                                ftx_obj.outputs[0].amount = target_amount
+                                print(f"[BROADCAST] Adjusted funding output for fee: vsize={vsize}, fee>={need_fee} sats")
+                        ftx_hex = ensure_hex_str(ftx_obj.to_hex() if hasattr(ftx_obj, 'to_hex') else ftx_obj)
+                        if ftx_hex and len(ftx_hex) > 100:
+                            print(f"[BROADCAST] Broadcasting funding_tx from DTO (fallback)...")
+                            broadcast_service(transaction=ftx_hex)
+                            print(f"[BROADCAST] Success broadcasting funding_tx from DTO")
+                            funding_broadcasted = True
+                            # Wait for funding to propagate
+                            dto_ftx_txid = _get_txid(ftx_hex)
+                            if dto_ftx_txid:
+                                print(f"[BROADCAST] Waiting for DTO funding TX {dto_ftx_txid[:8]}... to propagate")
+                                if not _wait_for_mempool_propagation(dto_ftx_txid):
+                                    print(f"[BROADCAST] WARNING: DTO funding TX not found in mempool after 30s")
+                    except Exception as e:
+                        print(f"[BROADCAST] WARNING: Failed to broadcast funding_tx from DTO: {e}")
+        except Exception as e:
+            print(f"[BROADCAST] Fallback funding broadcast error: {e}")
+
+    # If funding still not propagated, abort children to avoid inputs-missingorspent
+    # UNLESS the UTXO is already Taproot (wrapper was done in setup phase)
+    try:
+        if not funding_broadcasted and not is_taproot_utxo and expected_funding_txid:
+            print(f"[BROADCAST] WARNING: Funding not broadcasted; aborting children")
+            return {
+                "setup_uuid": setup_uuid,
+                "broadcasted_count": 0,
+                "broadcasted_txids": [],
+                "skipped_count": 0,
+                "skipped_txids": [],
+                "failed_count": 0,
+                "failed_txs": [],
+                "status": "funding_not_broadcasted",
+            }
+        elif is_taproot_utxo:
+            print(f"[BROADCAST] Funding is already Taproot, proceeding with child transactions")
+    except Exception:
+        pass
+
     # Parent-first mode: Broadcast hash_result_tx first and wait for confirmation
     hash_result_txid = None
     parent_confirmed = False

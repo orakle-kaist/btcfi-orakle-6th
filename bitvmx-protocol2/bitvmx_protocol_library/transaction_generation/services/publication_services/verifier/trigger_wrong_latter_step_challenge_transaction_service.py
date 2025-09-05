@@ -4,7 +4,6 @@ from typing import List
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
 from bitcoinutils.keys import PrivateKey
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_setup_properties_dto import (
     BitVMXProtocolSetupPropertiesDTO,
@@ -42,11 +41,8 @@ class GenericTriggerWrongLatterStepChallengeTransactionService:
         bitvmx_protocol_verifier_private_dto: BitVMXProtocolVerifierPrivateDTO,
         bitvmx_protocol_verifier_dto: BitVMXProtocolVerifierDTO,
     ):
-        trigger_read_challenge_taptree = (
-            bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_read_challenge_taptree()
-        )
-        trigger_read_challenge_scripts_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_read_challenge_address(
-            destroyed_public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key
+        trigger_read_challenge_scripts_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_read_challenge_scripts_list.get_taproot_address(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
         current_index = self._get_index(
             bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto
@@ -62,9 +58,8 @@ class GenericTriggerWrongLatterStepChallengeTransactionService:
         private_key = PrivateKey(
             b=bytes.fromhex(bitvmx_protocol_verifier_private_dto.verifier_signature_private_key)
         )
-        wrong_latter_step_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=trigger_read_challenge_taptree,
+        wrong_latter_step_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_read_challenge_scripts_list.get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=current_index,
             is_odd=trigger_read_challenge_scripts_address.is_odd(),
         )
@@ -111,7 +106,7 @@ class GenericTriggerWrongLatterStepChallengeTransactionService:
                 + trigger_read_challenge_signature
                 + [
                     current_script.to_hex(),
-                    wrong_latter_step_control_block.to_hex(),
+                    wrong_latter_step_control_block_hex,
                 ]
             )
         )

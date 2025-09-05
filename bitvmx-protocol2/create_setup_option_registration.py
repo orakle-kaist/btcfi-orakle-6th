@@ -72,6 +72,34 @@ n1 = str((n0_base + 2) | (1 << 255) | 1)  # Slightly different, also odd
 print(f"🔑 Generated n0: {n0[:20]}...")
 print(f"🔑 Generated n1: {n1[:20]}...")
 
+# Calculate wrapper TX fee based on estimated vsize
+# P2WPKH input (68 vbytes) + P2TR output (43 vbytes) + overhead (11 vbytes) ≈ 122 vbytes
+# But we'll use a conservative 200 vbytes to ensure it gets mined
+wrapper_vsize = 200
+sat_per_vbyte = 50  # Current network fee rate
+wrapper_fee = wrapper_vsize * sat_per_vbyte
+print(f"💸 Calculated wrapper fee: {wrapper_fee} sats ({wrapper_vsize} vbytes @ {sat_per_vbyte} sat/vB)")
+
+# Adjust funding amount for wrapper fee if we'll need to create wrapper TX
+# Check if the UTXO is P2WPKH (needs wrapper) or already P2TR (no wrapper needed)
+adjusted_funding_amount = funding_amount
+try:
+    utxo_response = requests.get(f"https://mutinynet.com/api/tx/{funding_tx_id}")
+    if utxo_response.status_code == 200:
+        tx_data = utxo_response.json()
+        if funding_index < len(tx_data.get("vout", [])):
+            scriptpubkey = tx_data["vout"][funding_index].get("scriptpubkey", "")
+            if scriptpubkey.startswith("0014"):  # P2WPKH
+                print(f"📦 UTXO is P2WPKH, wrapper TX will be needed")
+                adjusted_funding_amount = funding_amount - wrapper_fee
+                print(f"💰 Adjusted funding amount: {adjusted_funding_amount} sats (after {wrapper_fee} sats wrapper fee)")
+            elif scriptpubkey.startswith("5120"):  # P2TR
+                print(f"✅ UTXO is already P2TR, no wrapper needed")
+except Exception as e:
+    print(f"⚠️ Could not determine UTXO type: {e}")
+    # Conservative: assume wrapper is needed
+    adjusted_funding_amount = funding_amount - wrapper_fee
+
 # Setup data with only actually used parameters
 setup_data = {
     "n0": n0,
@@ -81,8 +109,8 @@ setup_data = {
     "max_amount_of_steps": 16,  # Reduced for faster testing (2^4)
     "funding_tx_id": funding_tx_id,    # 자동으로 찾은 UTXO 사용
     "funding_index": funding_index,     # 자동으로 찾은 index 사용
-    "funding_amount": funding_amount,   # 실제 UTXO 금액 사용
-    "step_fees": 30000,
+    "funding_amount": adjusted_funding_amount,   # Adjusted for wrapper fee if needed
+    "step_fees": 7000,  # Standard fee for regular transactions (hash_result uses HASH_FEES_SATOSHIS)
     "amount_of_bits_wrong_step_search": 2,  # 줄여서 빠른 테스트 (최대값은 3)
     "amount_of_bits_per_digit_checksum": 4,  # 체크섬 자릿수 비트 (필수)
     "secret_origin_of_funds": "d8a1e1224e63135765bde9dc8a2c8e403eee8be73d3589d58c5ddbf9dce3fdf4",
@@ -93,6 +121,7 @@ setup_data = {
     "amount_of_input_words": 4,  # 🔥 FIX: option_type, strike, expiry, pool_size (4 words = 32 hex chars)
     "elf_file_name": "option_registration_final.elf"  # 🔥 FIX: 원래 옵션 ELF 파일 사용
 }
+
 
 def create_setup():
     """Create the setup."""
@@ -116,7 +145,7 @@ def create_setup():
             '-H', 'Content-Type: application/json',
             '-d', f'@{temp_file}',
             '-s',  # Silent mode
-            '--max-time', '600'  # 10 minute timeout (증가!)
+            '--max-time', '1800'  # 30 minute timeout for first-time merkle computation
         ]
         
         print(f"📡 Executing: {' '.join(curl_cmd[:3])}...")
@@ -150,9 +179,27 @@ def create_setup():
                     "elf_file": setup_data["elf_file_name"]
                 }, f, indent=2)
             
+            # Read DTO from file since API response doesn't include it
+            dto_file = f"prover_files/{setup_uuid}/bitvmx_protocol_setup_properties_dto.json"
+            print(f"📂 Reading DTO from: {dto_file}")
+            
+            # Wait for file to be created
+            import time as time2
+            for i in range(10):
+                if os.path.exists(dto_file):
+                    break
+                time2.sleep(1)
+            
+            if not os.path.exists(dto_file):
+                print(f"❌ DTO file not found: {dto_file}")
+                return None
+            
+            with open(dto_file, "r") as f:
+                dto_data = json.load(f)
+            
             # Extract verifier data
             verifier_data = {
-                "bitvmx_protocol_setup_properties_dto": prover_result["bitvmx_protocol_setup_properties_dto"]
+                "bitvmx_protocol_setup_properties_dto": dto_data
             }
             
             # Step 2: Call verifier using curl
@@ -224,11 +271,59 @@ if __name__ == "__main__":
     print(f"Input Hex: {setup_data['input_hex']}")
     print(f"Wrong Step Search Bits: {setup_data['amount_of_bits_wrong_step_search']}")
     print(f"Checksum Bits: {setup_data['amount_of_bits_per_digit_checksum']}")
+    print(f"Funding: {adjusted_funding_amount} sats (original: {funding_amount})")
     print("=" * 60)
     
     setup_uuid = create_setup()
     
     if setup_uuid:
         print(f"\n✅ Setup created successfully: {setup_uuid}")
+        
+        # For No-Faucet mode: Broadcast wrapper TX if it exists
+        wrapper_tx_path = "/tmp/funding_tx.hex"
+        if os.path.exists(wrapper_tx_path):
+            print("\n" + "=" * 60)
+            print("📡 WRAPPER TX BROADCAST (No-Faucet Mode)")
+            print("=" * 60)
+            
+            with open(wrapper_tx_path, "r") as f:
+                wrapper_tx_hex = f.read().strip()
+            
+            print(f"📦 Wrapper TX found (length: {len(wrapper_tx_hex)} chars)")
+            print(f"🔄 Converting P2WPKH → P2TR")
+            
+            # Broadcast wrapper TX
+            try:
+                response = requests.post(
+                    "https://mutinynet.com/api/tx",
+                    headers={"Content-Type": "text/plain"},
+                    data=wrapper_tx_hex
+                )
+                
+                if response.status_code == 200:
+                    wrapper_txid = response.text.strip()
+                    print(f"✅ Wrapper TX broadcast successful!")
+                    print(f"📝 TXID: {wrapper_txid}")
+                    print(f"🔗 https://mutinynet.com/tx/{wrapper_txid}")
+                    
+                    # Wait for confirmation
+                    print("\n⏳ Waiting for wrapper TX to be confirmed...")
+                    print("   (This creates the P2TR UTXO needed for hash_result_tx)")
+                    
+                    # Save wrapper TXID for reference
+                    with open(f"prover_files/{setup_uuid}/wrapper_txid.txt", "w") as f:
+                        f.write(wrapper_txid)
+                    
+                    print("\n📌 IMPORTANT: Wait for 1 confirmation before proceeding!")
+                    print("   Then run: python test_final.py")
+                    
+                else:
+                    print(f"❌ Wrapper TX broadcast failed: {response.text}")
+                    
+            except Exception as e:
+                print(f"❌ Error broadcasting wrapper TX: {e}")
+        else:
+            print("\n📌 No wrapper TX needed (using native P2TR UTXO)")
+            
     else:
         print("\n❌ Setup creation failed")

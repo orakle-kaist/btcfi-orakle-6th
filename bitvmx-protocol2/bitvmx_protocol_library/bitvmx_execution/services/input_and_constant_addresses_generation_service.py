@@ -13,9 +13,16 @@ class InputAndConstantAddressesGenerationService:
     def __call__(self, input_length: int):
         with open(self.instruction_commitment) as mapping_file:
             mapping_lines = mapping_file.readlines()
-        input_line = list(filter(lambda x: ".input Start" in x, mapping_lines))[0]
-        match = re.search(r"Start:\s+(0x[0-9a-fA-F]+)", input_line)
-        init_input_address = match.group(1)[2:]
+        
+        # Try to find .input Start line (for old format)
+        input_lines = list(filter(lambda x: ".input Start" in x, mapping_lines))
+        if input_lines:
+            input_line = input_lines[0]
+            match = re.search(r"Start:\s+(0x[0-9a-fA-F]+)", input_line)
+            init_input_address = match.group(1)[2:]
+        else:
+            # Use default input address from linker script
+            init_input_address = "aa000000"
         constant_lines = list(filter(lambda x: x.startswith("Address:"), mapping_lines))
         constant_memory_regions = {}
         while len(constant_lines) > 0:

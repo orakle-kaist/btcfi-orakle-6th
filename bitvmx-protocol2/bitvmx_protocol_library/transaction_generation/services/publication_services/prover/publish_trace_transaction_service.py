@@ -1,7 +1,6 @@
 from typing import List
 
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_execution.services.execution_trace_query_service import (
     ExecutionTraceQueryService,
@@ -157,9 +156,8 @@ class PublishTraceTransactionService:
             public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
 
-        trace_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trace_script_list.to_scripts_tree(),
+        trace_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trace_script_list.get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trace_script_index(),
             is_odd=trace_script_address.is_odd(),
         )
@@ -170,7 +168,7 @@ class PublishTraceTransactionService:
                 + trace_witness
                 + [
                     trace_script.to_hex(),
-                    trace_control_block.to_hex(),
+                    trace_control_block_hex,
                 ]
             )
         )

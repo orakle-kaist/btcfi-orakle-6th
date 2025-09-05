@@ -174,9 +174,9 @@ class GenerateOptionPresignService:
         )
         
         # 7. Control block 생성
-        control_block = ControlBlock(
-            self.unspendable_public_key,
-            scripts=settlement_scripts_list.to_scripts_tree(),
+        # Use precomputed control block from our script list to avoid library recomputation
+        control_block_hex = settlement_scripts_list.get_control_block_hex(
+            public_key=self.unspendable_public_key,
             index=0,
             is_odd=settlement_address.is_odd(),
         )
@@ -185,7 +185,7 @@ class GenerateOptionPresignService:
         settlement_witness = TxWitnessInput([
             presign_signature,
             settlement_script.to_hex(),
-            control_block.to_hex(),
+            control_block_hex,
         ])
         
         # 9. Pre-sign 데이터 패키징
@@ -199,7 +199,7 @@ class GenerateOptionPresignService:
             "settlement_script_hex": settlement_script.to_hex(),
             "settlement_address": str(settlement_address),
             "presign_signature": presign_signature,
-            "control_block_hex": control_block.to_hex(),
+            "control_block_hex": control_block_hex,
             "settlement_witness": settlement_witness.to_list(),
             "funding_amount": funding_amount,
             "settlement_amount": settlement_amount,

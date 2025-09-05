@@ -118,9 +118,12 @@ class GenerateSignaturesController:
             bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,
         )
 
+        # Use standard version for now due to performance issues with optimized versions
+        print("[VERIFIER SIGNATURES] Using standard signature generation")
         generate_signatures_service = self.generate_signatures_service_class(
             destroyed_private_key, bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
+        
         bitvmx_signatures_dto = generate_signatures_service(
             bitvmx_protocol_setup_properties_dto=bitvmx_protocol_setup_properties_dto,
         )

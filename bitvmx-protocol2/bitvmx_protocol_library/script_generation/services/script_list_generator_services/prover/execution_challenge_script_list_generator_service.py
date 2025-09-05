@@ -22,13 +22,9 @@ class ExecutionChallengeScriptListGeneratorService:
         return [9, 10, 11, 12, 0, 1, 3, 4, 6, 7, 8]
         # return [9, 10, 11, 12, 3, 4, 0, 1, 6, 7, 8]
 
-    def __init__(self):
+    def __init__(self, elf_file_name: str = None):
         self.verify_input_nibble_message_from_public_keys = VerifyDigitSignatureNibblesService()
-        self.execution_trace_commitment_generation_service = (
-            ExecutionTraceCommitmentGenerationService(
-                "./execution_files/instruction_mapping.txt",
-            )
-        )
+        self.elf_file_name = elf_file_name
 
     def _generate_script_for_file(
         self,
@@ -37,7 +33,11 @@ class ExecutionChallengeScriptListGeneratorService:
         trace_words_lengths,
         bits_per_digit_checksum,
     ):
-        key_list, instruction_dict = self.execution_trace_commitment_generation_service()
+        execution_trace_commitment_generation_service = ExecutionTraceCommitmentGenerationService(
+            "./execution_files/instruction_mapping.txt",
+            self.elf_file_name,
+        )
+        key_list, instruction_dict = execution_trace_commitment_generation_service()
         script_list = []
 
         total_amount_of_processes = multiprocessing.cpu_count()
@@ -134,9 +134,11 @@ class ExecutionChallengeScriptListGeneratorService:
         # bitcoin_script_list = BitcoinScriptList(script_list)
 
         # New method
-        key_list, instruction_dict, opcode_dict = (
-            self.execution_trace_commitment_generation_service()
+        execution_trace_commitment_generation_service = ExecutionTraceCommitmentGenerationService(
+            "./execution_files/instruction_mapping.txt",
+            self.elf_file_name,
         )
+        key_list, instruction_dict, opcode_dict = execution_trace_commitment_generation_service()
 
         bitvmx_execution_script_list = BitVMXExecutionScriptList(
             key_list=key_list,

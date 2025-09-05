@@ -1,0 +1,56 @@
+{
+  "detail": [
+    {
+      "type": "missing",
+      "loc": [
+        "body",
+        "prover_signature_private_key"
+      ],
+      "msg": "Field required",
+      "input": {
+        "max_amount_of_steps": 16,
+        "amount_of_input_words": 2,
+        "amount_of_bits_wrong_step_search": 2,
+        "amount_of_bits_per_digit_checksum": 4,
+        "funding_tx_id": "3398087bd04b8f47e20700fa451d8c455986d0e93a2787ed6280e383f0f6bf87",
+        "funding_index": 1,
+        "funding_amount": 10000000,
+        "secret_origin_of_funds": "fc1ab66c2b20971f1a500ee25314bbb5fe1a36449f560ea57f572804e80df76a",
+        "prover_destination_address": "tb1qt8rdur557nz338g3lekc6458pj0dl63c0s9904",
+        "prover_signature_private_key_hex": "086734704e8d120df2ae539c1b14048841c5e71f6bfa4b342cf23a965ac05c7e",
+        "n0": "26180192348613224343743828085794938110237764917303167994207025191693423542457",
+        "n1": "29839173003476110406600696399690868940457391834016918578643438612234967113585",
+        "elf_file_name": "option_registration_final.elf",
+        "input_hex": "0000C350000F4240",
+        "timeout_seconds": 600
+      },
+      "url": "https://errors.pydantic.dev/2.3/v/missing"
+    },
+    {
+      "type": "missing",
+      "loc": [
+        "body",
+        "prover_signature_public_key"
+      ],
+      "msg": "Field required",
+      "input": {
+        "max_amount_of_steps": 16,
+        "amount_of_input_words": 2,
+        "amount_of_bits_wrong_step_search": 2,
+        "amount_of_bits_per_digit_checksum": 4,
+        "funding_tx_id": "3398087bd04b8f47e20700fa451d8c455986d0e93a2787ed6280e383f0f6bf87",
+        "funding_index": 1,
+        "funding_amount": 10000000,
+        "secret_origin_of_funds": "fc1ab66c2b20971f1a500ee25314bbb5fe1a36449f560ea57f572804e80df76a",
+        "prover_destination_address": "tb1qt8rdur557nz338g3lekc6458pj0dl63c0s9904",
+        "prover_signature_private_key_hex": "086734704e8d120df2ae539c1b14048841c5e71f6bfa4b342cf23a965ac05c7e",
+        "n0": "26180192348613224343743828085794938110237764917303167994207025191693423542457",
+        "n1": "29839173003476110406600696399690868940457391834016918578643438612234967113585",
+        "elf_file_name": "option_registration_final.elf",
+        "input_hex": "0000C350000F4240",
+        "timeout_seconds": 600
+      },
+      "url": "https://errors.pydantic.dev/2.3/v/missing"
+    }
+  ]
+}

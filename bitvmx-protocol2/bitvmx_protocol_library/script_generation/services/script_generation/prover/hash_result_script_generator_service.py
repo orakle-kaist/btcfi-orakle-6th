@@ -12,8 +12,9 @@ from bitvmx_protocol_library.winternitz_keys_handling.scripts.verify_digit_signa
 
 class HashResultScriptGeneratorService:
 
-    def __init__(self):
-        self.verify_input_nibbles_message_from_public_keys = VerifyDigitSignatureNibblesService()
+    def __init__(self, bits_per_digit: int = 4):
+        self.bits_per_digit = 8 if bits_per_digit == 8 else 4
+        self.verify_input_nibbles_message_from_public_keys = VerifyDigitSignatureNibblesService(bits_per_digit=self.bits_per_digit)
 
     def __call__(
         self,
@@ -27,11 +28,13 @@ class HashResultScriptGeneratorService:
     ):
         script = BitcoinScript()
 
+        # per-word digit count depends on base: 8 nibbles or 4 bytes
+        per_word_digits = 4 if self.bits_per_digit == 8 else 8
         for input_public_keys in reversed(input_public_keys_list):
             self.verify_input_nibbles_message_from_public_keys(
                 script,
                 input_public_keys,
-                8,
+                per_word_digits,
                 bits_per_digit_checksum,
                 to_alt_stack=True,
             )

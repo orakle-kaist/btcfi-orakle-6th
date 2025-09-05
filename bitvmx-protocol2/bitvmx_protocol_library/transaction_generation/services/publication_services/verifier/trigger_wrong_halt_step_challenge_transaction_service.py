@@ -1,7 +1,6 @@
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
 from bitcoinutils.keys import PrivateKey
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_setup_properties_dto import (
     BitVMXProtocolSetupPropertiesDTO,
@@ -53,9 +52,8 @@ class TriggerWrongHaltStepChallengeTransactionService:
             current_script_index
         ]
 
-        trigger_wrong_halt_step_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=trigger_challenge_taptree,
+        trigger_wrong_halt_step_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.trigger_trace_challenge_scripts_list.get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=current_script_index,
             is_odd=trigger_challenge_scripts_address.is_odd(),
         )
@@ -108,7 +106,7 @@ class TriggerWrongHaltStepChallengeTransactionService:
                 + trigger_input_equivocation_signatures
                 + [
                     current_script.to_hex(),
-                    trigger_wrong_halt_step_control_block.to_hex(),
+                    trigger_wrong_halt_step_control_block_hex,
                 ]
             )
         )

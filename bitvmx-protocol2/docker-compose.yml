@@ -5,11 +5,12 @@ services:
      - .env_common
      - .env_prover
     environment:
-      - STEP_FEES_SATOSHIS=3000
-      - HASH_FEES_SATOSHIS=3000
-      - CHOICE_FEES_SATOSHIS=1000
-      - TRIGGER_FEES_SATOSHIS=3000
+      - STEP_FEES_SATOSHIS=7000
+      - HASH_FEES_SATOSHIS=60000
+      - CHOICE_FEES_SATOSHIS=4000
+      - TRIGGER_FEES_SATOSHIS=7000
       - INITIAL_AMOUNT_SATOSHIS=100000
+      - BITVMX_DIGIT_BITS=8
     volumes:
       - type: bind
         source: .
@@ -18,6 +19,7 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "8080:80"
+    command: uvicorn prover_app.main:app --host 0.0.0.0 --port 80 --timeout-keep-alive 1800 --reload
     networks:
       - bitvmx-net
 
@@ -34,55 +36,9 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "8081:80"
+    command: uvicorn verifier_app.main:app --host 0.0.0.0 --port 80 --timeout-keep-alive 1800 --reload
     networks:
       - bitvmx-net
-
-  bitcoin-regtest-node:
-#    build:
-#      context: .
-#      target: kylemanna/bitcoind
-    image: kylemanna/bitcoind
-    ports:
-      - "8443:8443"
-    networks:
-      - bitvmx-net
-    volumes:
-      - type: bind
-        source: regtestbitcoin.conf
-        target: /bitcoin/.bitcoin/bitcoin.conf
-#    volumes:
-#      - type: bind
-#        source: ./bitcoin_data
-#        target: /root/.bitcoin
-
-  format:
-    build:
-      context: .
-      target: bitvmx-base
-    image: bitvmx-base
-    volumes:
-      - type: bind
-        source: .
-        target: /bitvmx-backend
-    entrypoint: sh -c "black --config .black . && ruff check --fix"
-
-  flake8:
-    image: bitvmx-base
-    volumes:
-      - type: bind
-        source: ./
-        target: /bitvmx-backend
-        read_only: true
-    entrypoint: flake8
-
-  black:
-    image: bitvmx-base
-    volumes:
-      - type: bind
-        source: ./
-        target: /bitvmx-backend
-        read_only: true
-    entrypoint: black --config .black --check --diff .
 
 networks:
   bitvmx-net:

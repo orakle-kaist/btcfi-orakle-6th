@@ -38,10 +38,11 @@ def _compute_checksum(
 
 class GenerateWitnessFromInputNibblesService:
 
-    def __init__(self, secret_key: PrivateKey):
+    def __init__(self, secret_key: PrivateKey, bits_per_digit: int = 4):
+        self.bits_per_digit = 8 if bits_per_digit == 8 else 4
         self.compute_max_checksum_service = ComputeMaxChecksumService()
         self.generate_winternitz_keys_nibbles_service = GenerateWinternitzKeysNibblesService(
-            secret_key
+            secret_key, bits_per_digit=self.bits_per_digit
         )
 
     def __call__(
@@ -50,9 +51,11 @@ class GenerateWitnessFromInputNibblesService:
         case: int,
         input_numbers: List[int],
         bits_per_digit_checksum: int,
+        bits_per_digit_override: int = None,
     ):
-
-        d0 = 2**4
+        # Determine base for this call
+        call_bits = self.bits_per_digit if bits_per_digit_override is None else (8 if bits_per_digit_override == 8 else 4)
+        d0 = 2 ** call_bits
         n0 = len(input_numbers)
         d1, n1, max_checksum_value = self.compute_max_checksum_service(
             d0, n0, bits_per_digit_checksum
@@ -63,7 +66,18 @@ class GenerateWitnessFromInputNibblesService:
             max_checksum_value,
             n1,
         )
-        current_keys = self.generate_winternitz_keys_nibbles_service(step, case, n0)
+        # Use key generator with matching bits; recreate if override differs
+        key_gen = self.generate_winternitz_keys_nibbles_service
+        if bits_per_digit_override is not None and call_bits != self.bits_per_digit:
+            try:
+                from bitcoinutils.keys import PrivateKey
+                sk_hex = getattr(self.generate_winternitz_keys_nibbles_service, 'private_key', None)
+                if sk_hex:
+                    key_gen = GenerateWinternitzKeysNibblesService(PrivateKey(b=bytes.fromhex(sk_hex)), bits_per_digit=call_bits)
+            except Exception:
+                # fallback to existing generator
+                key_gen = self.generate_winternitz_keys_nibbles_service
+        current_keys = key_gen(step, case, n0)
         input_keys = current_keys[n1:]
         checksum_keys = current_keys[:n1]
         # checksum_keys.reverse()

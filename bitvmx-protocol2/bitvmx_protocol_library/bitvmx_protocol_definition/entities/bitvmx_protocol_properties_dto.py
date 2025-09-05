@@ -3,6 +3,7 @@ from datetime import timedelta
 from typing import ClassVar, List
 
 from pydantic import BaseModel
+import os
 
 from bitvmx_protocol_library.classproperty import classproperty
 from bitvmx_protocol_library.winternitz_keys_handling.services.compute_max_checksum_service import (
@@ -79,7 +80,12 @@ class BitVMXProtocolPropertiesDTO(BaseModel):
 
     @property
     def amount_of_bits_per_digit(self):
-        return 4
+        # Allow override via env var BITVMX_DIGIT_BITS (default 4)
+        try:
+            v = int(os.getenv("BITVMX_DIGIT_BITS", "4"))
+            return 8 if v == 8 else 4
+        except Exception:
+            return 4
 
     @property
     def amount_of_wrong_step_search_hashes_per_iteration(self) -> int:

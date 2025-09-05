@@ -83,6 +83,19 @@ async def next_step_post(next_step_post_input: NextStepPostV1Input = Body()):
             # Regenerate transactions using current funding_tx_id and funding_index
             print(f"[NEXT_STEP] Using funding_tx_id: {dto.funding_tx_id}, index: {dto.funding_index}")
             
+            # CRITICAL: Fetch the REAL amount from the chain to prevent bad-txns-in-belowout
+            from blockchain_query_services.services.mutinynet_api.transaction_info_service import TransactionInfoService
+            tx_info_service = TransactionInfoService()
+            try:
+                funding_tx_info = tx_info_service(tx_id=dto.funding_tx_id)
+                if dto.funding_index < len(funding_tx_info.outputs):
+                    actual_amount = funding_tx_info.outputs[dto.funding_index].value
+                    if dto.funding_amount_of_satoshis != actual_amount:
+                        print(f"[NEXT_STEP] Correcting funding amount from {dto.funding_amount_of_satoshis} to {actual_amount}")
+                        dto.funding_amount_of_satoshis = actual_amount
+            except Exception as e:
+                print(f"[NEXT_STEP] WARNING: Could not fetch live funding amount: {e}")
+            
             # The generator expects the full DTO as parameter
             dto.bitvmx_transactions_dto = tx_generator(
                 bitvmx_protocol_setup_properties_dto=dto

@@ -1,7 +1,6 @@
 from typing import Dict
 
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_execution.services.execution_trace_query_service import (
     ExecutionTraceQueryService,
@@ -141,9 +140,11 @@ class PublishHashReadSearchTransactionService:
                 bits_per_digit_checksum=bitvmx_protocol_setup_properties_dto.bitvmx_protocol_properties_dto.amount_of_bits_per_digit_checksum,
             )
 
-        current_hash_search_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=current_hash_search_taptree,
+        # Use cached/control-block hex from the script list rather than library recomputation
+        current_hash_search_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_read_search_scripts_list(
+            iteration=iteration
+        ).get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=current_hash_search_index,
             is_odd=current_hash_search_address.is_odd(),
         )
@@ -156,7 +157,7 @@ class PublishHashReadSearchTransactionService:
                 + hash_read_search_witness
                 + [
                     current_hash_search_script.to_hex(),
-                    current_hash_search_control_block.to_hex(),
+                    current_hash_search_control_block_hex,
                 ]
             )
         )

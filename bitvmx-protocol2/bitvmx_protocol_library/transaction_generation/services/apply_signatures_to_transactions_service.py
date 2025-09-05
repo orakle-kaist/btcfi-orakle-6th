@@ -683,6 +683,15 @@ class ApplySignaturesToTransactionsService:
                     print(f"[SIGN] Signing funding UTXO: {funding_tx_id}:{funding_index}")
                     print(f"[SIGN] Funding address: {funding_address}")
                     
+                    # CRITICAL: Reduce output amount to create fee for wrapper TX
+                    # This is P2WPKH -> P2TR conversion, needs fee
+                    wrapper_fee = 5000  # 5000 sats for ~200 byte transaction
+                    if hasattr(funding_tx, 'outputs') and funding_tx.outputs:
+                        original_output = funding_tx.outputs[0].amount
+                        funding_tx.outputs[0].amount = max(0, original_output - wrapper_fee)
+                        print(f"[SIGN] Reduced funding output by {wrapper_fee} sats for tx fee")
+                        print(f"[SIGN] Original: {original_output}, New: {funding_tx.outputs[0].amount}")
+                    
                     funding_tx = self._sign_funding_input_if_needed(
                         funding_tx,
                         funding_input_amount,  # Use exact input UTXO amount
@@ -755,21 +764,10 @@ class ApplySignaturesToTransactionsService:
                     print(f"[HASH_RESULT] Using signature from: VERIFIER")
                     print(f"[HASH_RESULT] Destroyed public key: {str(destroyed_public_key)[:66]}")
                     
-                    # Hash result script is a single script, not a list
-                    # Create a simple control block for it
-                    hash_result_address = hash_result_script.get_taproot_address(destroyed_public_key)
+                    # Hash result script is a single script; compute control block using library for consistency
+                    hash_result_address = destroyed_public_key.get_taproot_address([[hash_result_script]])
                     print(f"[HASH_RESULT] Address parity (is_odd) = {hash_result_address.is_odd()}")
-                    
-                    # For single script, use simple control block
-                    from bitcoinutils.keys import PublicKey
-                    from bitcoinutils.constants import LEAF_VERSION_TAPSCRIPT
-                    
-                    # Get x-only public key
-                    xonly_hex = self._xonly_hex(destroyed_public_key)
-                    if len(xonly_hex) == 66 and xonly_hex[:2] in ('02', '03'):
-                        xonly_hex = xonly_hex[2:]
-                    internal_xonly = bfromhex_safe(xonly_hex)
-                    
+
                     # Log prevout information
                     if tx.inputs and len(tx.inputs) > 0:
                         prevout_txid = tx.inputs[0].txid
@@ -782,14 +780,18 @@ class ApplySignaturesToTransactionsService:
                             print(f"[HASH_RESULT] Expected funding_tx: {expected_funding}")
                             print(f"[HASH_RESULT] Prevout matches funding: {prevout_txid.lower() == expected_funding.lower()}")
                     
-                    # Create control block: version_byte + internal_pubkey
-                    is_odd = hash_result_address.is_odd()
-                    version_byte = 0xC0 | (0x01 if is_odd else 0x00)
-                    control_block_bytes = bytes([version_byte]) + internal_xonly
+                    # Create control block via bitcoinutils ControlBlock for single-leaf
+                    from bitcoinutils.utils import ControlBlock
+                    control_block_hex = ControlBlock(
+                        destroyed_public_key,
+                        scripts=[[hash_result_script]],
+                        index=0,
+                        is_odd=hash_result_address.is_odd(),
+                    ).to_hex()
+                    control_block_bytes = bfromhex_safe(control_block_hex)
                     
                     print(f"[HASH_RESULT] Control block first byte = {hex(control_block_bytes[0])}")
                     print(f"[HASH_RESULT] Control block length = {len(control_block_bytes)} bytes")
-                    print(f"[HASH_RESULT] Control block parity: {'odd' if is_odd else 'even'}")
                     
                     # Log script content summary
                     script_hex = hash_result_script.to_hex() if hasattr(hash_result_script, 'to_hex') else str(hash_result_script)

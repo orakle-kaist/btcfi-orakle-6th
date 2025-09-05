@@ -251,10 +251,16 @@ class BitVMXExecutionScriptList(BaseModel):
     bits_per_digit_checksum: int
     taproot_address_pubkey: Optional[str] = None
     taproot_address_is_odd: Optional[bool] = None
+    _tree_key: Optional[str] = None  # Pre-computed tree key for consistency
     
     class Config:
         # Pydantic이 private field를 무시하도록 설정
         underscore_attrs_are_private = True
+
+    def set_fixed_tree_keys(self, tree_key: str):
+        """Set pre-computed tree key to ensure consistency across regenerations"""
+        self._tree_key = tree_key
+        print(f"[EXEC_TREE_KEY] Set fixed tree_key: {tree_key[:16]}...")
 
     @staticmethod
     def get_tree_depth(splitted_key_list: Union[List, str]):

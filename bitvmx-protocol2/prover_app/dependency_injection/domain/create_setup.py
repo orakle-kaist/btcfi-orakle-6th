@@ -3,7 +3,7 @@ from dependency_injector import containers, providers
 from bitvmx_protocol_library.bitvmx_protocol_definition.services.public_keys_generation.generate_prover_public_keys_service import (
     GenerateProverPublicKeysService,
 )
-# Try to import optimized script generator first
+# Use optimized version (parallel has async issues)
 try:
     from bitvmx_protocol_library.script_generation.services.bitvmx_bitcoin_scripts_generator_service_optimized import (
         BitVMXBitcoinScriptsGeneratorServiceOptimized as BitVMXBitcoinScriptsGeneratorService,
@@ -43,7 +43,7 @@ from prover_app.domain.controllers.v1.setup.create_setup_controller import Creat
 
 
 class CreateSetupControllers(containers.DeclarativeContainer):
-    bitvmx_protocol = providers.Singleton(
+    bitvmx_protocol = providers.Factory(
         CreateSetupController,
         broadcast_transaction_service=broadcast_transaction_service,
         transaction_info_service=transaction_info_service,

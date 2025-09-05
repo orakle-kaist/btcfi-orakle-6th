@@ -1,0 +1,16 @@
+{
+  "max_amount_of_steps": 16,
+  "amount_of_input_words": 2,
+  "amount_of_bits_wrong_step_search": 2,
+  "amount_of_bits_per_digit_checksum": 4,
+  "funding_tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+  "funding_index": 0,
+  "funding_amount": 10000000,
+  "secret_origin_of_funds": "b0a77b8e66427dae3b2e8d43b61201628db6734a737bcda7b03d6ea6a40e958f",
+  "prover_destination_address": "tb1qt8rdur557nz338g3lekc6458pj0dl63c0s9904",
+  "prover_signature_private_key_hex": "ddf057c72d714ff9ed8b65ba945947f8d5fcaeea82bc656719792e33a7f7af87",
+  "n0": "59756664130613124895190247087075357800545573439335053132212116042026989381951",
+  "n1": "110088024114033391565111834480933077498433431726793981697053876715605189387069",
+  "elf_file_name": "option_registration_final.elf",
+  "input_hex": "0000C350000F4240"
+}

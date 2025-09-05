@@ -1,7 +1,6 @@
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
 from bitcoinutils.keys import PrivateKey
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_setup_properties_dto import (
     BitVMXProtocolSetupPropertiesDTO,
@@ -43,9 +42,6 @@ class TriggerReadSearchEquivocationTransactionService:
         bitvmx_protocol_verifier_dto: BitVMXProtocolVerifierDTO,
     ):
         iteration = len(bitvmx_protocol_verifier_dto.read_search_choices)
-        trigger_challenge_taptree = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_read_search_script_list(
-            iteration=iteration
-        ).to_scripts_tree()
         trigger_challenge_scripts_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_read_search_script_list(
             iteration=iteration
         ).get_taproot_address(
@@ -60,9 +56,10 @@ class TriggerReadSearchEquivocationTransactionService:
             trigger_challenge_index
         ]
 
-        trigger_challenge_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=trigger_challenge_taptree,
+        trigger_challenge_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_read_search_script_list(
+            iteration=iteration
+        ).get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=trigger_challenge_index,
             is_odd=trigger_challenge_scripts_address.is_odd(),
         )
@@ -116,7 +113,7 @@ class TriggerReadSearchEquivocationTransactionService:
                 + trigger_challenge_signatures
                 + [
                     trigger_challenge_script.to_hex(),
-                    trigger_challenge_control_block.to_hex(),
+                    trigger_challenge_control_block_hex,
                 ]
             )
         )

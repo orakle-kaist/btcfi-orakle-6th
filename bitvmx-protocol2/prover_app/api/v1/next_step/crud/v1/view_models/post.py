@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel
 
 from bitvmx_protocol_library.transaction_generation.enums import TransactionProverStepType
@@ -5,6 +6,8 @@ from bitvmx_protocol_library.transaction_generation.enums import TransactionProv
 
 class NextStepPostV1Input(BaseModel):
     setup_uuid: str
+    regen_transactions: Optional[bool] = False
+    force_resign: Optional[bool] = False
 
     model_config = {
         "json_schema_extra": {"examples": [{"setup_uuid": "289a04aa-5e35-4854-a71c-8131db874440"}]}

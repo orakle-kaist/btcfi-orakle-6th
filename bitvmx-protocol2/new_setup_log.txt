@@ -1,0 +1,38 @@
+🔍 Finding available UTXOs...
+  ✅ Found UTXO: d8334144d490d07777cd9fa9146a059da2196023b91e590a03450d363e4bf150:0 with 10000000 sats
+  ✅ Found UTXO: 00292f632514dd3ac4197885e7f4a2cb107bfefba904f22ef142ad8352f5ed54:1 with 10000000 sats
+  ✅ Found UTXO: da6b7a685583f654ff8efc291d3fe0970057190aa2768b6c8effc9fd287405ea:1 with 10000000 sats
+  ✅ Found UTXO: 3f50a8e25da947b511cef3eab2fdeed646f8e87fa6b2b2985c34dd945171b314:0 with 10000000 sats
+  ✅ Found UTXO: 1c4ecc42563fcd2ad3f55245aff671d320066f3d721b6dd1c104d4ecd86c4614:1 with 10000000 sats
+  ✅ Found UTXO: 9012f477b9be868a162b6d73fe6709cff5c2b9f266e25efad1faf6f64b2f194f:0 with 9999997 sats
+  ✅ Found UTXO: 447917951f0c5afced7afcdc4c524a4b540b70499646d8717d63710fcc1189e1:1 with 10000000 sats
+  ✅ Found UTXO: 04f230d1da5325137580c291a1828bdc6612c7a1001aaf62f83b62bffcd03479:1 with 10000000 sats
+  🎯 Selected UTXO: d8334144d490d07777cd9fa9146a059da2196023b91e590a03450d363e4bf150:0 with 10000000 sats
+📊 Using UTXO: d8334144d490d07777cd9fa9146a059da2196023b91e590a03450d363e4bf150:0
+💰 Amount: 10000000 sats
+🔑 Generated n0: 57896044618658097711...
+🔑 Generated n1: 57896044618658097711...
+============================================================
+BitVMX Option Registration Setup
+ELF: option_registration_final.elf
+Max Steps: 16
+Input Words: 4 (option_type, strike, expiry, pool_size)
+Input Hex: 00000000404b4c0067d84e00005ed0b2
+Wrong Step Search Bits: 2
+Checksum Bits: 4
+============================================================
+
+🚀 Creating setup with option_registration_final.elf and 16 steps...
+⏰ Started at: 16:54:00
+
+📤 Step 1: Calling prover setup with curl...
+📡 Executing: curl -X POST...
+📄 Sending data from: /var/folders/8y/62yr08ns7312t88d02sqgpvw0000gn/T/tmpm18y3cor.json
+   - funding_tx_id: d8334144d490d07777cd9fa9146a059da2196023b91e590a03450d363e4bf150
+   - funding_amount: 10000000 sats
+   - elf_file_name: option_registration_final.elf
+   - max_steps: 16
+✅ Prover responded in 1973.1 seconds
+❌ Prover error: return code 28
+
+❌ Setup creation failed

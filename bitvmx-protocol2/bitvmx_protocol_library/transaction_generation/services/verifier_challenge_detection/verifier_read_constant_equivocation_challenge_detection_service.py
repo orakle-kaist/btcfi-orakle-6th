@@ -34,7 +34,9 @@ class VerifierReadConstantEquivocationChallengeDetectionService:
         # This goes here and not in the init because the plan is to agree it on the setup phase
         input_and_constant_addresses_generation_service = (
             InputAndConstantAddressesGenerationService(
-                instruction_commitment=ExecutionTraceGenerationService.commitment_file()
+                instruction_commitment=ExecutionTraceGenerationService.commitment_file(
+                    bitvmx_protocol_setup_properties_dto.elf_file_name
+                )
             )
         )
         static_addresses = input_and_constant_addresses_generation_service(

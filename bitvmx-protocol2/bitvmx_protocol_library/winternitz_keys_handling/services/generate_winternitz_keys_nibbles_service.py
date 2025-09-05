@@ -14,10 +14,10 @@ from bitvmx_protocol_library.winternitz_keys_handling.services.compute_max_check
 
 class GenerateWinternitzKeysNibblesService:
 
-    def __init__(self, private_key: PrivateKey, bits_per_digit_checksum: Optional[int] = 4):
+    def __init__(self, private_key: PrivateKey, bits_per_digit: int = 4, bits_per_digit_checksum: Optional[int] = 4):
         self.private_key = private_key.to_bytes().hex()
         self.bits_per_digit_checksum = bits_per_digit_checksum
-        self.d0 = 2**4
+        self.d0 = 2 ** (8 if bits_per_digit == 8 else 4)
         self.compute_max_checksum_service = ComputeMaxChecksumService()
 
     def __call__(self, step: int, case: int, n0: int):

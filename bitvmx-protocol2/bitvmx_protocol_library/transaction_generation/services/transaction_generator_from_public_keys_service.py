@@ -5,6 +5,7 @@ from bitcoinutils.setup import get_network
 from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_setup_properties_dto import (
     BitVMXProtocolSetupPropertiesDTO,
 )
+from bitvmx_protocol_library.config import common_protocol_properties
 from bitvmx_protocol_library.script_generation.services.bitvmx_bitcoin_scripts_generator_service import (
     BitVMXBitcoinScriptsGeneratorService,
 )
@@ -56,14 +57,19 @@ class TransactionGeneratorFromPublicKeysService:
             script_sig=Script([])  # Initialize with empty script for segwit
         )
 
-        hash_result_script_address = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_result_script.get_taproot_address(
+        # Use the Taproot tree (hash_result + prover_timeout) for the funding output
+        from bitvmx_protocol_library.script_generation.entities.business_objects.bitcoin_script_list import BitcoinScriptList
+        golden_hash_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.hash_result_script
+        prover_timeout_script = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.prover_timeout_script
+        funding_script_tree = BitcoinScriptList([golden_hash_script, prover_timeout_script])
+        funding_taproot_address = funding_script_tree.get_taproot_address(
             bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
 
-        # Create main output for the protocol
+        # Create main output for the protocol to the tree address
         funding_txout = TxOutput(
             bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis,
-            hash_result_script_address.to_script_pub_key(),
+            funding_taproot_address.to_script_pub_key(),
         )
         
         # Create outputs list
@@ -83,9 +89,10 @@ class TransactionGeneratorFromPublicKeysService:
         actual_funding_index = bitvmx_protocol_setup_properties_dto.funding_index
         hash_result_txin = TxInput(actual_funding_txid, actual_funding_index, script_sig=Script([]))
         print(f"[TXGEN] Using actual funding UTXO: {actual_funding_txid}:{actual_funding_index}")
+        # Use dedicated hash fee for the heavy hash_result tx
         hash_result_output_amount = (
             bitvmx_protocol_setup_properties_dto.funding_amount_of_satoshis
-            - bitvmx_protocol_setup_properties_dto.step_fees_satoshis
+            - int(common_protocol_properties.hash_fees_satoshis)
         )
         # first_txOut = TxOutput(first_output_amount, P2wpkhAddress.from_address(address=faucet_address).to_script_pub_key())
         hash_result_txOut = TxOutput(

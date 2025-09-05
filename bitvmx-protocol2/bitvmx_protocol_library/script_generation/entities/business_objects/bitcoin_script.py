@@ -33,11 +33,13 @@ class BitcoinScript(Script):
 
     @staticmethod
     def from_raw(scriptrawhex: str, has_segwit: bool = False):
-        return BitcoinScript(
-            super(BitcoinScript, BitcoinScript)
-            .from_raw(scriptrawhex=scriptrawhex, has_segwit=has_segwit)
-            .script
-        )
+        raw_script_obj = Script.from_raw(scriptrawhex=scriptrawhex, has_segwit=has_segwit)
+        return BitcoinScript(script=raw_script_obj.script)
+    
+    @staticmethod
+    def from_hex(scripthex: str):
+        """Create BitcoinScript from hex string (alias for from_raw)"""
+        return BitcoinScript.from_raw(scripthex)
 
     @staticmethod
     def from_int_list(script_list: List[int], has_segwit: bool = False):

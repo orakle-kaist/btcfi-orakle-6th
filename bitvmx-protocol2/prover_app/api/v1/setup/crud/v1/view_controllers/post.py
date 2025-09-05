@@ -47,5 +47,6 @@ class SetupPostViewControllerV1:
             prover_destination_address=setup_post_view_input.prover_destination_address,
             prover_signature_private_key=setup_post_view_input.prover_signature_private_key,
             prover_signature_public_key=setup_post_view_input.prover_signature_public_key,
+            elf_file_name=setup_post_view_input.elf_file_name,
         )
         return SetupPostV1Output(setup_uuid=setup_uuid)

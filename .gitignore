@@ -137,3 +137,4 @@ bitcoin_scanner.py
 bitcoin_scanner/
 docker-btc-regtest-stack/
 esplora_data/
+md/

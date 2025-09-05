@@ -1,7 +1,6 @@
 from typing import Dict, Tuple
 
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_execution.services.execution_trace_query_service import (
     ExecutionTraceQueryService,
@@ -61,12 +60,10 @@ class PublishChoiceSearchTransactionService:
         ).get_taproot_address(
             public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key
         )
-        current_choice_search_scripts_taptree = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_search_scripts_list(
+        current_choice_search_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.choice_search_scripts_list(
             iteration=iteration
-        ).to_scripts_tree()
-        current_choice_search_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=current_choice_search_scripts_taptree,
+        ).get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=0,
             is_odd=current_choice_search_scripts_address.is_odd(),
         )
@@ -79,7 +76,7 @@ class PublishChoiceSearchTransactionService:
                 + choice_search_witness
                 + [
                     current_choice_search_script.to_hex(),
-                    current_choice_search_control_block.to_hex(),
+                    current_choice_search_control_block_hex,
                 ]
             )
         )

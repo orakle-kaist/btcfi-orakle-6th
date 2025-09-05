@@ -11,9 +11,9 @@ from bitvmx_protocol_library.winternitz_keys_handling.services.compute_max_check
 
 class VerifyDigitSignatureNibblesService:
 
-    def __init__(self):
+    def __init__(self, bits_per_digit: int = 4):
         self.compute_max_checksum_service = ComputeMaxChecksumService()
-        self.d0 = 2**4
+        self.d0 = 2 ** (8 if bits_per_digit == 8 else 4)
 
     def __call__(
         self,

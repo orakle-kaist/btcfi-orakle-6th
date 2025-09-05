@@ -95,7 +95,8 @@ from bitvmx_protocol_library.script_generation.services.script_list_generator_se
 
 class BitVMXBitcoinScriptsGeneratorService:
 
-    def __init__(self):
+    def __init__(self, elf_file_name: str = None):
+        self.elf_file_name = elf_file_name
         self.hash_result_script_generator = HashResultScriptGeneratorService()
         self.trigger_protocol_script_generator = TriggerProtocolScriptGeneratorService()
         self.commit_search_hashes_script_generator_service = (
@@ -444,7 +445,7 @@ class BitVMXBitcoinScriptsGeneratorService:
         )
         self.input_and_constant_addresses_generation_service = (
             InputAndConstantAddressesGenerationService(
-                instruction_commitment=ExecutionTraceGenerationService.commitment_file()
+                instruction_commitment=ExecutionTraceGenerationService.commitment_file(elf_file_name=self.elf_file_name)
             )
         )
         static_addresses = self.input_and_constant_addresses_generation_service(
@@ -620,7 +621,7 @@ class BitVMXBitcoinScriptsGeneratorService:
 
         input_and_constant_addresses_generation_service = (
             InputAndConstantAddressesGenerationService(
-                instruction_commitment=ExecutionTraceGenerationService.commitment_file()
+                instruction_commitment=ExecutionTraceGenerationService.commitment_file(elf_file_name=self.elf_file_name)
             )
         )
         input_and_constant_addresses = input_and_constant_addresses_generation_service(

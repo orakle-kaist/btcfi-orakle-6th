@@ -1,7 +1,6 @@
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
 from bitcoinutils.keys import PrivateKey
 from bitcoinutils.transactions import TxWitnessInput
-from bitcoinutils.utils import ControlBlock
 
 from bitvmx_protocol_library.bitvmx_protocol_definition.entities.bitvmx_protocol_prover_private_dto import (
     BitVMXProtocolProverPrivateDTO,
@@ -47,9 +46,8 @@ class TriggerWrongReadTraceStepTransactionService:
                 current_script_index
             ]
         )
-        trigger_wrong_trace_step_control_block = ControlBlock(
-            bitvmx_protocol_setup_properties_dto.unspendable_public_key,
-            scripts=trigger_wrong_read_trace_step_taptree,
+        trigger_wrong_trace_step_control_block_hex = bitvmx_protocol_setup_properties_dto.bitvmx_bitcoin_scripts_dto.read_trace_script_list.get_control_block_hex(
+            public_key=bitvmx_protocol_setup_properties_dto.unspendable_public_key,
             index=current_script_index,
             is_odd=trigger_wrong_read_trace_step_scripts_address.is_odd(),
         )
@@ -90,7 +88,7 @@ class TriggerWrongReadTraceStepTransactionService:
                 + trigger_wrong_read_trace_step_signatures
                 + [
                     current_script.to_hex(),
-                    trigger_wrong_trace_step_control_block.to_hex(),
+                    trigger_wrong_trace_step_control_block_hex,
                 ]
             )
         )

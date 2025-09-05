@@ -162,13 +162,35 @@ def _get_tree_depth(splitted_list: Union[List, BitcoinScript]) -> int:
     return 1 + max(_get_tree_depth(splitted_list[0]), _get_tree_depth(splitted_list[1]))
 
 
+# Cache for tree script counts
+_tree_count_cache = {}
+
 def _count_scripts_in_tree(tree: Union[List, BitcoinScript]) -> int:
-    """Count the number of BitcoinScript leaves in the tree."""
+    """Count the number of BitcoinScript leaves in the tree with memoization."""
+    global _tree_count_cache
+    
+    # Create cache key
     if isinstance(tree, BitcoinScript):
         return 1
     if not tree:
         return 0
-    return sum(_count_scripts_in_tree(child) for child in tree)
+    
+    # Try to create a hashable cache key
+    try:
+        import pickle
+        cache_key = hashlib.sha256(pickle.dumps(tree, protocol=pickle.HIGHEST_PROTOCOL)).hexdigest()[:16]
+    except:
+        # Fallback: just compute without cache
+        return sum(_count_scripts_in_tree(child) for child in tree)
+    
+    # Check cache
+    if cache_key in _tree_count_cache:
+        return _tree_count_cache[cache_key]
+    
+    # Compute and cache
+    count = sum(_count_scripts_in_tree(child) for child in tree)
+    _tree_count_cache[cache_key] = count
+    return count
 
 
 def _traverse_for_merkle_path(
@@ -257,7 +279,7 @@ def _traverse_for_merkle_path(
 
 class BitcoinScriptList:
 
-    def __init__(self, script_list: Optional[Union[BitcoinScript, List[BitcoinScript]]] = None):
+    def __init__(self, script_list: Optional[Union[BitcoinScript, List[BitcoinScript]]] = None, tree_key: Optional[str] = None):
         if script_list is None:
             self.script_list = []
         elif isinstance(script_list, BitcoinScript):
@@ -268,63 +290,123 @@ class BitcoinScriptList:
             self.script_list = script_list
         else:
             raise Exception("Type not supported")
+        
+        # Store pre-computed tree_key if provided
+        self._tree_key = tree_key
+        if tree_key:
+            print(f"[BitcoinScriptList] Using pre-computed tree_key: {tree_key}")
+        
+        # Tree memoization: cache merkle tree structure
+        self._cached_tree = None
+        self._tree_computed = False
 
     def append(self, script: BitcoinScript):
         self.script_list.append(script)
+        # Invalidate cached tree when list changes
+        self._cached_tree = None
+        self._tree_computed = False
 
     def extend(self, scripts: List[BitcoinScript]):
         for elem in scripts:
             assert isinstance(elem, BitcoinScript)
         self.script_list.extend(scripts)
+        # Invalidate cached tree when list changes
+        self._cached_tree = None
+        self._tree_computed = False
 
     def __getitem__(self, index: int):
         return self.script_list[index]
 
+    def set_fixed_tree_keys(self, tree_key: str):
+        """Set pre-computed tree key to ensure consistency across regenerations"""
+        self._tree_key = tree_key
+        print(f"[TREE_KEY] Set fixed tree_key: {tree_key[:16]}...")
+    
     def __add__(self, other: Union["BitcoinScriptList", BitcoinScript]) -> "BitcoinScriptList":
         assert isinstance(other, BitcoinScriptList) or isinstance(other, BitcoinScript)
         if isinstance(other, BitcoinScript):
             script_list_copy = self.script_list.copy()
             script_list_copy.append(other)
-            return BitcoinScriptList(script_list_copy)
+            # Compute deterministic tree key for the combined list based on its tree
+            if len(script_list_copy) == 1:
+                combined_tree = [script_list_copy]
+            else:
+                combined_tree = SplitListForMerkleTreeService()(script_list_copy)
+            combined_key = _get_stable_cache_key(combined_tree)
+            return BitcoinScriptList(script_list_copy, tree_key=combined_key)
         elif isinstance(other, BitcoinScriptList):
-            return BitcoinScriptList(self.script_list + other.script_list)
+            combined = self.script_list + other.script_list
+            # Compute deterministic tree key for the combined list based on its tree
+            if len(combined) == 1:
+                combined_tree = [combined]
+            else:
+                combined_tree = SplitListForMerkleTreeService()(combined)
+            combined_key = _get_stable_cache_key(combined_tree)
+            return BitcoinScriptList(combined, tree_key=combined_key)
         raise Exception("Type not supported")
 
     def __len__(self):
         return len(self.script_list)
 
     def to_scripts_tree(self):
+        # Use cached tree if available
+        if self._tree_computed and self._cached_tree is not None:
+            print(f"[TreeMemoization] Using cached tree for {len(self.script_list)} scripts")
+            return self._cached_tree
+        
+        # Compute tree
         if len(self.script_list) == 1:
-            return [self.script_list]
+            tree = [self.script_list]
         else:
             split_list_for_merkle_tree_service = SplitListForMerkleTreeService()
-            return split_list_for_merkle_tree_service(self.script_list)
+            tree = split_list_for_merkle_tree_service(self.script_list)
+        
+        # Cache the computed tree
+        self._cached_tree = tree
+        self._tree_computed = True
+        print(f"[TreeMemoization] Computed and cached tree for {len(self.script_list)} scripts")
+        
+        return tree
 
     def get_taproot_address(self, public_key: PublicKey) -> P2trAddress:
         global _address_cache, _cache_stats
         
         # Create a simple cache key based on script content and public key
         key_x = public_key.to_bytes()[:32]
+        xonly_pubkey_hex = key_x.hex()
         
-        # Generate a stable cache key for this specific address
+        # Generate content-based cache key using pre-computed tree_key if available
         if len(self.script_list) == 0:
-            address_cache_key = f"empty:{key_x.hex()[:16]}"
+            tree_key = "empty"
+            address_cache_key = f"empty:{xonly_pubkey_hex}"
         else:
-            # Use script count and first/last script as fingerprint
-            script_fingerprint = f"{len(self.script_list)}"
-            if self.script_list:
-                script_fingerprint += f":{self.script_list[0].to_hex()[:16]}"
-                if len(self.script_list) > 1:
-                    script_fingerprint += f":{self.script_list[-1].to_hex()[:16]}"
-            address_cache_key = f"addr:{script_fingerprint}:{key_x.hex()[:16]}"
+            # Use pre-computed tree_key if available (O(1))
+            if self._tree_key:
+                tree_key = self._tree_key
+            else:
+                # Fallback: compute tree key (expensive, should be avoided)
+                print(f"[WARNING] Computing tree_key on-the-fly in get_taproot_address for {len(self.script_list)} scripts. This should be pre-computed!")
+                print(f"[DEBUG] Script list first item type: {type(self.script_list[0]) if self.script_list else 'empty'}")
+                # Use stable content-based key generation to ensure determinism
+                tree_key = _get_stable_cache_key(self.to_scripts_tree())
+                # Persist the computed key to avoid recomputation and stabilize control blocks
+                self._tree_key = tree_key
+            
+            address_cache_key = (tree_key, xonly_pubkey_hex)
+        
+        # Use tree_key as fingerprint for logging
+        fingerprint = tree_key[:8] if tree_key != "empty" else "empty"
+        print(f"[TAPROOT] Computing for {len(self.script_list)} scripts, fingerprint: {fingerprint}")
         
         # Check global cache
         if address_cache_key in _address_cache:
             _cache_stats['addr_hits'] += 1
             cached = _address_cache[address_cache_key]
+            print(f"[TAPROOT] ✓ Cache hit (fingerprint: {fingerprint})")
             return P2trAddress(witness_program=cached[0], is_odd=cached[1])
         
         _cache_stats['addr_misses'] += 1
+        print(f"[TAPROOT] ✗ Cache miss (fingerprint: {fingerprint})")
         
         # Calculate the address
         if len(self.script_list) == 0:
@@ -386,7 +468,15 @@ class BitcoinScriptList:
         if isinstance(xonly_hex, bytes):
             xonly_hex = xonly_hex.hex()
         
-        cache_key = _get_stable_cache_key(self.script_list)
+        # Use pre-computed tree_key if available (O(1))
+        if self._tree_key:
+            cache_key = self._tree_key
+        else:
+            # Fallback: compute tree key (expensive, should be avoided)
+            print(f"[WARNING] Computing tree_key on-the-fly in get_control_block_hex for {len(self.script_list)} scripts at index {index}. This should be pre-computed!")
+            cache_key = _get_stable_cache_key(self.to_scripts_tree())
+            # Persist computed key for stability across subsequent calls
+            self._tree_key = cache_key
         control_key = (cache_key, index, xonly_hex, is_odd)
         
         # Check cache first
